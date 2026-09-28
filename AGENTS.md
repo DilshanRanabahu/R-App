@@ -8,9 +8,11 @@ A React Native (Expo) Android app to manage a **Huawei B312-926** 4G router from
 
 | Document | Purpose | Rule |
 |---|---|---|
-| [FEATURES.md](FEATURES.md) | What to build: features, priorities (P1–P3), endpoints, phases, **status** | Source of truth for scope. Build in phase order. Update the Checked (⏳ → ✅) and Status (⬜ → 🔨 → ✅) columns and the Progress table as you go. |
-| [DESIGN.md](DESIGN.md) | How it looks: colors, type, components, screens, states | Follow it for all UI. No design choices outside it without asking. |
+| [docs/FEATURES.md](docs/FEATURES.md) | What to build: features, priorities (P1–P3), endpoints, phases, **status** | Source of truth for scope. Build in phase order. Update the Checked (⏳ → ✅) and Status (⬜ → 🔨 → ✅) columns and the Progress table as you go. |
+| [docs/DESIGN.md](docs/DESIGN.md) | How it looks: colors, type, components, screens, states | Follow it for all UI. No design choices outside it without asking. |
 | AGENTS.md (this file) | How to work: stack, architecture, **security**, safety, conventions | Rules here override convenience. |
+
+Project docs live in `docs/`; `AGENTS.md` and `CLAUDE.md` stay in the root because agent tools look for them there.
 
 If these documents conflict, **security rules in this file win**, then FEATURES.md for scope, then DESIGN.md for UI.
 
