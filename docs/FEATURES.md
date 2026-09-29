@@ -24,7 +24,7 @@ A React Native (Expo) app for managing a Huawei B312-926 (HUAWEI 4G Router 2s) f
 | Built, not yet exercised | Logout, remember password, session expiry / idle logout, mobile data **switching**, reboot + waiting screen, "Trust new router" flow |
 | Security built | Router fingerprint pinning, encrypted password storage (opt-in), login attempt limiter, idle/background logout, screenshot blocking, device re-auth for risky actions, cleartext only to the router, log redaction |
 | App icon | Designed and generated (`assets/`); visible only after a standalone build |
-| Tests | 57 unit tests passing; type check + lint clean |
+| Tests | 120 unit tests passing; type check + lint clean |
 
 ## Legend
 
@@ -49,8 +49,8 @@ A React Native (Expo) app for managing a Huawei B312-926 (HUAWEI 4G Router 2s) f
 | 1.5 | Logout | P1 | `POST /api/user/logout` | Yes | ⏳ | 🔨 |
 | 1.6 | Remember password securely (opt-in, fingerprint/PIN) | P1 | `expo-secure-store` | — | — | 🔨 |
 | 1.7 | Session expiry handling (`100003`) → back to login, no auto-retry loop | P1 | — | — | — | 🔨 |
-| 1.8 | Handle forced first-login password change | P2 | `POST /api/user/password` | Yes | ⏳ | ⬜ |
-| 1.9 | Change admin password | P2 | `POST /api/user/password` | Yes | ⏳ | ⬜ |
+| 1.8 | Handle forced first-login password change | P2 | `POST /api/user/password_scram` (see 1.9) | Yes | ⏳ | ⬜ |
+| 1.9 | Change admin password (Router → Security; confirm + fingerprint/PIN; screenshot-blocked) | P2 | `POST /api/user/password_scram` (RSA-OAEP body, scheme copied from the router's web UI) | Yes | ⏳ scheme read from web UI JS, not yet run | 🔨 |
 
 ## 2. Dashboard (home screen)
 
@@ -62,8 +62,8 @@ A React Native (Expo) app for managing a Huawei B312-926 (HUAWEI 4G Router 2s) f
 | 2.4 | Total data used (lifetime) | P1 | `GET /api/monitoring/traffic-statistics` | No | ✅ | ✅ |
 | 2.5 | SIM status | P1 | `GET /api/monitoring/converged-status` | No | ✅ | ✅ |
 | 2.6 | Connection status, Wi-Fi client count | P1 | `GET /api/monitoring/status` | Token | ✅ | ✅ |
-| 2.7 | Unread SMS badge | P2 | `GET /api/monitoring/check-notifications` | Token | ⏳ | ⬜ |
-| 2.8 | Live speed chart (last 60 s) | P2 | built from 2.2 polling | — | — | ⬜ |
+| 2.7 | Unread SMS badge | — | `GET /api/monitoring/check-notifications` | Token | ✅ | ✖ dropped with SMS |
+| 2.8 | Live speed chart (last 60 s) | P2 | built from 2.2 polling | — | — | ✅ |
 
 ## 3. Signal & network
 
@@ -83,9 +83,9 @@ A React Native (Expo) app for managing a Huawei B312-926 (HUAWEI 4G Router 2s) f
 
 | # | Feature | Priority | Endpoint(s) | Login | Checked | Status |
 |---|---|---|---|---|---|---|
-| 4.1 | Monthly data usage | P2 | `GET /api/monitoring/month_statistics` | Yes | ⏳ | ⬜ |
-| 4.2 | Set monthly data limit + start date + alert % | P2 | `GET/POST /api/monitoring/start_date` | Yes | ⏳ | ⬜ |
-| 4.3 | Usage progress bar vs. limit | P2 | computed | — | — | ⬜ |
+| 4.1 | Monthly data usage (today + this month, on Home) | P2 | `GET /api/monitoring/month_statistics` | No | ✅ | ✅ |
+| 4.2 | Set monthly data limit + start date + alert % | P2 | `GET/POST /api/monitoring/start_date` | No (GET) · Yes (POST) | ✅ GET · ⏳ POST | 🔨 read only (plan shown on Home; setting it not built) |
+| 4.3 | Usage progress bar vs. limit | P2 | computed | — | — | 🔨 (no plan set on the router yet, so not seen on the phone) |
 | 4.4 | Reset statistics | P3 | `POST /api/monitoring/clear-traffic` | Yes | ⏳ | ⬜ |
 | 4.5 | Local daily usage history (app-side, stored on phone) | P3 | built from polling | — | — | ⬜ |
 
@@ -97,24 +97,9 @@ A React Native (Expo) app for managing a Huawei B312-926 (HUAWEI 4G Router 2s) f
 | 5.2 | Roaming on/off, auto-connect | P3 | `GET/POST /api/dialup/connection` | Yes | ⏳ | ⬜ |
 | 5.3 | APN profiles (view / add / select) | P3 | `GET/POST /api/dialup/profiles` | Yes | ⏳ | ⬜ |
 
-## 6. SMS
+## 6. SMS / 7. USSD — dropped
 
-| # | Feature | Priority | Endpoint(s) | Login | Checked | Status |
-|---|---|---|---|---|---|---|
-| 6.1 | Inbox list (paged) | P2 | `POST /api/sms/sms-list` | Yes | ⏳ | ⬜ |
-| 6.2 | Read message + mark as read | P2 | `POST /api/sms/set-read` | Yes | ⏳ | ⬜ |
-| 6.3 | Send SMS | P2 | `POST /api/sms/send-sms`, `GET /api/sms/send-status` | Yes | ⏳ | ⬜ |
-| 6.4 | Delete SMS | P2 | `POST /api/sms/delete-sms` | Yes | ⏳ | ⬜ |
-| 6.5 | Message counts (inbox / outbox / storage full) | P2 | `GET /api/sms/sms-count` | Yes | ⏳ | ⬜ |
-| 6.6 | Conversation (thread) view grouped by number | P3 | computed | — | — | ⬜ |
-
-## 7. USSD (balance / packages)
-
-| # | Feature | Priority | Endpoint(s) | Login | Checked | Status |
-|---|---|---|---|---|---|---|
-| 7.1 | Send USSD code (e.g. HUTCH balance check) | P2 | `POST /api/ussd/send`, `GET /api/ussd/get`, `GET /api/ussd/status` | Yes | ⏳ | ⬜ |
-| 7.2 | Saved quick codes (balance, data balance, packages) | P2 | app-side | — | — | ⬜ |
-| 7.3 | Multi-step USSD menus (reply to prompts) | P3 | `POST /api/ussd/send` | Yes | ⏳ | ⬜ |
+Removed on 2026-09-29 (owner's choice): the owner doesn't need SMS or USSD in the app, and the Messages tab was replaced by a **Router** tab (management). The router does expose `sms/*` and `ussd/*` (they answer `100003` login required, not `100002` not supported), so they could come back later. The old plan was: inbox, read / mark read, send, delete, counts, threads (6.1–6.6); USSD send, saved quick codes, multi-step menus (7.1–7.3). For SMS in the meantime, use the router web page (`http://192.168.8.1` → SMS).
 
 ## 8. Connected devices
 
@@ -131,9 +116,9 @@ A React Native (Expo) app for managing a Huawei B312-926 (HUAWEI 4G Router 2s) f
 
 | # | Feature | Priority | Endpoint(s) | Login | Checked | Status |
 |---|---|---|---|---|---|---|
-| 9.1 | View / change SSID, hide SSID | P2 | `GET/POST /api/wlan/basic-settings` or `multi-basic-settings` | Yes | ⏳ | ⬜ |
-| 9.2 | View / change Wi-Fi password (**RSA-encrypted**, reveal needs fingerprint/PIN) | P2 | `GET/POST /api/wlan/security-settings` or `multi-security-settings` | Yes | ⏳ | ⬜ |
-| 9.3 | Show Wi-Fi QR code for guests to scan (screenshot-blocked) | P2 | app-side (`WIFI:T:WPA;S:...;P:...;;`) | — | — | ⬜ |
+| 9.1 | View / change SSID, hide SSID (Router → Wi-Fi) | P2 | `GET/POST /api/wlan/multi-basic-settings` (POST `;enp`, only the main SSID, `WifiRestart=1`) | Yes | ✅ GET · ⏳ POST | 🔨 |
+| 9.2 | View / change Wi-Fi password (reveal needs fingerprint/PIN; screenshot-blocked) | P2 | reveal: `POST /api/user/pwd` (RSA nonce → AES reply + HMAC); change: `WifiWpapsk` RSA-encrypted in `multi-basic-settings` | Yes | ⏳ | 🔨 |
+| 9.3 | Show Wi-Fi QR code for guests to scan (screenshot-blocked) | P2 | app-side (`WIFI:T:WPA;S:...;P:...;;`, `qrcode` lib + SVG) | — | — | 🔨 |
 | 9.4 | Wi-Fi on/off (warn: phone will disconnect) | P3 | `POST /api/wlan/wifi-feature-switch` | Yes | ⏳ | ⬜ |
 | 9.5 | Guest / multi-SSID | P3 | `multi-basic-settings` (`multssid_enable=1`) | Yes | ⏳ | ⬜ |
 | 9.6 | Wi-Fi channel / bandwidth | P3 | `GET/POST /api/wlan/multi-basic-settings` | Yes | ⏳ | ⬜ |
@@ -142,7 +127,7 @@ A React Native (Expo) app for managing a Huawei B312-926 (HUAWEI 4G Router 2s) f
 
 | # | Feature | Priority | Endpoint(s) | Login | Checked | Status |
 |---|---|---|---|---|---|---|
-| 10.1 | Device info: model, IMEI, IMSI, firmware, MAC, WAN IP (screenshot-blocked) | P2 | `GET /api/device/information` | Yes | ✅ (used for fingerprint) | ⬜ |
+| 10.1 | Device info: model, IMEI, IMSI, firmware, MAC, WAN IP (screenshot-blocked) | P2 | `GET /api/device/information` | Yes | ✅ | 🔨 model + firmware + running time on the Router tab status card (only those fields kept); full screen ⬜ |
 | 10.2 | **Reboot router** (confirm + fingerprint/PIN + waiting screen) | P1 | `POST /api/device/control` (`Control=1`) | Yes | ⏳ | 🔨 |
 | 10.3 | SIM PIN status / unlock | P3 | `GET/POST /api/pin/status`, `/api/pin/operate` | Yes | ⏳ | ⬜ |
 | 10.4 | Firmware update check | P3 | `GET /api/online-update/check-new-version` | Yes | ⏳ | ⬜ |
@@ -184,14 +169,19 @@ A React Native (Expo) app for managing a Huawei B312-926 (HUAWEI 4G Router 2s) f
 
 ```
 Tabs
-├── Home        → 2.x dashboard, 5.1 data toggle, 3.2 signal summary, device count   ✅
+├── Home        → 2.x dashboard + speed chart + top/average, session ↓/↑ split,
+│                 4.1 monthly usage (today / this month, plan bar) — no login needed    ✅
 ├── Signal      → 3.x details (antenna mode ⬜)                                        ✅
 ├── Devices     → 8.x Wi-Fi + cable devices                                            ✅
-├── Messages    → 6.x SMS, 7.x USSD                                                    ⬜ "coming soon" placeholder
-└── Settings    → Account (log in/out, forget password), App (router address, version),
-                  Danger zone (reboot) ✅ · Wi-Fi, data plan, network, device info ⬜
+├── Router      → status card (name, Online, running time, firmware) ✅, Wi-Fi (9.1–9.3 🔨),
+│                 Internet (5.1 mobile data) ✅, Security (1.9 admin password 🔨), Danger zone
+│                 (10.2 reboot) ✅ · next: data plan (4.2), auto reboot, blocked devices (8.4),
+│                 network mode (3.5) ⬜
+└── Settings    → the app only: Account (log in/out, forget password), App (router address, version) ✅
 Login (modal)   → 1.x, 12.1, 12.2, 12.4                                                ✅
 Rebooting       → 10.2 waiting screen                                                  🔨
+Wi-Fi           → 9.1–9.3 name, show password, QR, change (screenshot-blocked)           🔨
+Change password → 1.9 (screenshot-blocked)                                              🔨
 ```
 
 ## Build phases
@@ -199,7 +189,7 @@ Rebooting       → 10.2 waiting screen                                         
 1. **Phase 1 (MVP)**: ✅ project setup, router detection, no-login dashboard, login + token handling, signal, devices (Wi-Fi + cable), data toggle, reboot, security modules, app icon.
    - Remaining: test on the phone the logout, mobile data switch, reboot and remember-password flows.
 2. **Release (pending decision)**: standalone APK with the icon. Choose EAS cloud build (needs a free Expo account) or a local build (needs the Android SDK, ~4–5 GB). See [Release](#release).
-3. **Phase 2**: SMS, USSD, monthly usage + limit, Wi-Fi settings (RSA), Wi-Fi QR, device info, device details + MAC block, antenna positioning mode, app lock, speed chart.
+3. **Phase 2 (Router tab first)**: change admin password, Wi-Fi settings (RSA) + Wi-Fi QR, data plan, automatic reboot (`autoreboot_enable=1` on this router), device details + MAC block, network mode; then antenna positioning mode, app lock. Already done: speed chart, monthly usage, Router tab. SMS/USSD dropped.
 4. **Phase 3**: network mode, band lock, APN, notifications, widget, languages, factory reset.
 
 ## Release

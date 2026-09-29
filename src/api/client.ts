@@ -7,6 +7,23 @@ const TIMEOUT_MS = 8000;
 
 type BodyBuilder = XmlObject | ((token: string) => XmlObject | Promise<XmlObject>);
 
+export interface PostOptions {
+  /** Value escaping for the XML body (default: the 5 XML entities). */
+  escape?: (value: string) => string;
+  /** RSA-encrypt the XML body; it is then sent with the web UI's ";enc" content type. */
+  encrypt?: (xml: string) => string | Promise<string>;
+  /** Retry once with a fresh token on a bad-token error (default true). */
+  retryBadToken?: boolean;
+  /**
+   * Content-Type suffix the router reads, e.g. "enp" = "some fields are RSA-encrypted"
+   * (Wi-Fi settings). Ignored when `encrypt` is set, which always sends ";enc".
+   */
+  typeSuffix?: string;
+}
+
+const FORM_TYPE = 'application/x-www-form-urlencoded; charset=UTF-8';
+const ENCRYPTED_TYPE = `${FORM_TYPE};enc`;
+
 interface RawResponse {
   text: string;
   headers: Headers;
@@ -61,23 +78,30 @@ export class RouterClient {
    * function of the token (login hashes the password with it). A bad-token error
    * is retried once with a fresh token.
    */
-  post<T = unknown>(path: string, body: BodyBuilder): Promise<T> {
-    const run = () => this.doPost<T>(path, body, true);
+  post<T = unknown>(path: string, body: BodyBuilder, options: PostOptions = {}): Promise<T> {
+    const run = () => this.doPost<T>(path, body, options, options.retryBadToken ?? true);
     const result = this.postQueue.then(run, run);
     this.postQueue = result.catch(() => undefined);
     return result;
   }
 
-  private async doPost<T>(path: string, body: BodyBuilder, retry: boolean): Promise<T> {
+  private async doPost<T>(path: string, body: BodyBuilder, options: PostOptions, retry: boolean): Promise<T> {
     const token = await this.nextToken();
     const xmlBody = typeof body === 'function' ? await body(token) : body;
-    const res = await this.send(path, 'POST', buildRequest(xmlBody), token);
+    const xml = buildRequest(xmlBody, options.escape);
+    const payload = options.encrypt ? await options.encrypt(xml) : xml;
+    const type = options.encrypt
+      ? ENCRYPTED_TYPE
+      : options.typeSuffix
+        ? `${FORM_TYPE};${options.typeSuffix}`
+        : FORM_TYPE;
+    const res = await this.send(path, 'POST', payload, token, type);
     try {
       return parseResponse<T>(res.text);
     } catch (e) {
       if (retry && isRouterError(e, 'bad_token')) {
         this.tokens = [];
-        return this.doPost<T>(path, body, false);
+        return this.doPost<T>(path, body, options, false);
       }
       throw e;
     }
@@ -121,11 +145,12 @@ export class RouterClient {
     method: 'GET' | 'POST',
     body?: string,
     token?: string,
+    contentType: string = FORM_TYPE,
   ): Promise<RawResponse> {
     const headers: Record<string, string> = { 'X-Requested-With': 'XMLHttpRequest' };
     if (this.sessionId) headers.Cookie = `SessionID=${this.sessionId}`;
     if (token) headers.__RequestVerificationToken = token;
-    if (body) headers['Content-Type'] = 'application/x-www-form-urlencoded; charset=UTF-8';
+    if (body) headers['Content-Type'] = contentType;
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);

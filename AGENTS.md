@@ -23,7 +23,7 @@ If these documents conflict, **security rules in this file win**, then FEATURES.
 - **Phase 1 is built** and runs on the phone through Expo Go. The user has logged in successfully with the real router; dashboard, signal and devices (Wi-Fi + cable) are verified on the phone.
 - **Not yet exercised on the phone:** logout, remember password, session expiry, mobile data switching, reboot, "Trust new router".
 - **No standalone APK yet.** The app icon is generated in `assets/`. The build route (EAS cloud vs local Android SDK) is **the user's decision**; don't start either without asking (§9).
-- **Next:** Phase 2 (see FEATURES.md → Build phases).
+- **Next:** Phase 2, Router tab first (see FEATURES.md → Build phases). The Messages tab was replaced by a Router tab; SMS/USSD are dropped.
 - Full per-feature status is in FEATURES.md; per-screen status in DESIGN.md §17.
 
 ## 2. Environment
@@ -82,6 +82,7 @@ Before saying a task is done: `tsc`, `lint` and `test` pass, and the change was 
 | Non-secret prefs | `@react-native-async-storage/async-storage` |
 | UI | `react-native-safe-area-context`, `@expo/vector-icons` (Ionicons) + `expo-font`, `react-native-svg` |
 | Phone IP ("this phone") | `expo-network` |
+| Wi-Fi QR code | `qrcode` (exact `1.5.4`, MIT; only `create()` is used, drawn with `react-native-svg`) |
 | Build config | `expo-build-properties` + `plugins/withRouterNetworkSecurity.js` (§8.6) |
 | Release | `babel-plugin-transform-remove-console` in production (`babel.config.js`) |
 
@@ -99,8 +100,8 @@ src/
     (tabs)/index.tsx          # Home
     (tabs)/signal.tsx
     (tabs)/devices.tsx
-    (tabs)/messages.tsx
-    (tabs)/settings.tsx
+    (tabs)/router.tsx         # router management (status, mobile data, reboot, ...)
+    (tabs)/settings.tsx       # the app only (account, router address, version)
     antenna.tsx, device/[mac].tsx, settings/*.tsx   # sub-screens (Phase 2)
   api/
     client.ts                 # session cookie, token rotation, request queue, timeout
@@ -109,7 +110,7 @@ src/
     xml.ts                    # safe build/parse + escaping
     validate.ts               # input validators (SSID, Wi-Fi key, phone, USSD, IP, MAC)
     errors.ts                 # HiLink codes → typed errors + user messages
-    endpoints/                # monitoring, device, net, dialup, wlan (+ sms, ussd, lan later)
+    endpoints/                # monitoring, device, net, dialup, wlan (+ lan hosts)
     types.ts
     __tests__/  __fixtures__/ # tests; sanitized sample XML only
   security/
@@ -141,8 +142,16 @@ Layer rule: `src/app/` → `hooks/` + `state/` → `api/` + `security/`. Screens
 - Error codes: `100002` not supported · `100003` login required · `125001–125003` bad token (refresh token, retry **once**, rebuilding token-dependent bodies) · `108001/108002/108006` wrong credentials (never retry) · `108007` too many attempts · `108003` already logged in.
 - **Connected devices:** `wlan/host-list` returns Wi-Fi clients only. `lan/HostInfo` returns all clients (incl. cable, with `InterfaceType`/`Active`). `getHosts()` merges both by MAC; a LAN-only device is treated as "cable". If `lan/HostInfo` is unsupported, fall back to Wi-Fi only.
 - HiLink returns a single child as an object and several as an array; always normalize with `toArray()`.
-- RSA (`encrypt_enabled=1`): key from `GET /api/webserver/publickey`. Use the padding given by `rsapadingtype` in `state-login`; verify the exact scheme on the router before enabling Wi-Fi password changes.
+- RSA (`encrypt_enabled=1`): key from `GET /api/webserver/publickey` (2048-bit, e=65537 on this router). Padding from `rsapadingtype` in `state-login` (`1` = OAEP with SHA-1, as on this router; else PKCS#1 v1.5). **Scheme (from the router's web UI `doRSAEncrypt`, emui webui 6):** base64(UTF-8 XML) → blocks of 214 chars (OAEP) / 245 (PKCS#1) → RSA each block → concatenate as hex; POST with `Content-Type: application/x-www-form-urlencoded; charset=UTF-8;enc`. Implemented in `crypto.ts` `rsaEncryptHex` + `client.post(..., { encrypt })`.
+- **Admin password change:** `POST /api/user/password_scram` (not `user/password`) with `<username>admin</username><currentpassword/><newpassword/>`, values escaped like the web UI's `xss()` (`escapeLikeWebUi`: also `/ ( ) '` as numeric refs), body RSA-encrypted. Never auto-retried. Router rules (`web_pwd_simplify_enabled=1`): ≥ 8 chars, ASCII 32–126, no leading space. Errors: `108008` = "Password entered incorrectly too many times" (session ends), `125002` = session ends, anything else = "Password incorrect". After success the router ends the session.
+- **Wi-Fi settings** (copied from the router's own `wifisecurity.js` / `wificommon.js`, emui webui 6):
+  - Read: `GET wlan/multi-basic-settings` → `Ssids.Ssid[]`; main network = ID `...Radio.1.Ssid.1.`, guest = `...Ssid.2.`. `WifiWpapsk` is always empty here; `WifiBroadcast` 0 = visible, 1 = hidden. Values may contain numeric refs (`&#x2F;`), decode with `decodeCharRefs`.
+  - Reveal password: `POST user/pwd` `{module: wlan, nonce: RSA(nonceHex + saltHex)}` (two random 32-byte hex secrets) → `{pwd, hash, iter}`; PBKDF2-HMAC-SHA256(nonceHex text, salt bytes, iter, 32 B) → hex: AES-128 key = [0:32], IV = [32:48] + 8 zero bytes, HMAC key = [48:64]; check HMAC-SHA256(ciphertext) = hash, then AES-CBC decrypt → `<response>` with the keys. (`crypto.ts` `decryptSecretReply`.)
+  - Save: `POST wlan/multi-basic-settings` with `Content-Type: ...;enp` (body **not** RSA-wrapped), only the edited SSID entry (current fields in original order, secrets/WEP/Radius dropped, `WifiWpaencryptionmodes` AES for WPA2-PSK), `WifiRestart=1`. Values escaped like the page's `wifiEncode` (`escapeLikeWifiUi`, `'` → `&apos;`). New password = `RSA(wifiEncode(password))` hex in `WifiWpapsk` and `MixWifiWpapsk`; unchanged password = both omitted. Rules here (`wifispecialcharenable=1`, `chinesessid_enable=0`): name 1–32 keyboard chars (trimmed), key 8–63 keyboard chars, no leading space.
+  - Wi-Fi restarts on save: the phone may drop before the response (treat timeout as "probably saved").
+- **Web UI source for research:** page scripts (`/js/<page>.js`, e.g. `wifisecurity.js`, `wificommon.js`) are only served to a logged-in session (else `100003`), and are gzip-encoded. Find page names by guessing; `menu.js` loads `../js/<menu>.js`.
 - Use `GET /api/global/module-switch` to hide unsupported features (endpoint verified; not yet wired into the UI).
+- `monitoring/month_statistics` and `monitoring/start_date` are readable **without login** on this router (verified 2026-09-29). `start_date` gives the data plan: `SetMonthData=1` + `DataLimit` like `60GB` (1024 steps); `MonthLastClearTime` is when the counters were last reset.
 - Request timeout 8 s. Polling per DESIGN.md: traffic 2–3 s, signal 5 s (1 s in antenna mode), others on focus. **Stop all polling** when the screen is unfocused or the app is backgrounded.
 
 ## 7. UI rules (from DESIGN.md)
@@ -283,7 +292,7 @@ This app controls a **real, in-use router**. The laptop and phone depend on it f
 
 1. **Phase 1 (MVP): built.** Project setup, theme tokens, security modules (§8.2–8.6), router detection, no-login dashboard, login/session, signal, devices (Wi-Fi + cable), mobile data toggle, reboot, app icon. Remaining: phone tests of logout, mobile data switch, reboot, remember password (each needs the user's go-ahead, §9).
 2. **Release (pending user decision):** standalone APK with the icon via EAS Build or a local Android SDK build. Release signing: keystore **outside the repo**, wired with a config plugin (never hand-edit `android/`).
-3. **Phase 2:** SMS, USSD, monthly usage/limits, Wi-Fi settings (RSA), Wi-Fi QR, device info, device detail + MAC block, antenna positioning mode, app lock, speed chart, feature-flag hiding.
+3. **Phase 2 (Router tab first):** ~~change admin password, Wi-Fi settings (RSA) + Wi-Fi QR~~ (built, not yet run on the router), data plan, automatic reboot, device detail + MAC block, network mode; then antenna positioning mode, app lock, feature-flag hiding. Done: speed chart, monthly usage, Router tab. **SMS/USSD dropped** (owner's choice, 2026-09-29).
 4. **Phase 3:** network mode, band lock, APN, notifications, widget, languages, factory reset.
 
 Security modules are built **first**, not added later.
@@ -301,7 +310,7 @@ Security modules are built **first**, not added later.
 - Unit tests (Jest) with **mocked** router responses for: password hash, token rotation, request queue, XML escaping/parsing, error mapping, all validators, redaction, router address validation, fingerprint check, session timeout, lockout handling.
 - Security tests are required for every function in `src/security/` and `src/api/xml.ts`/`validate.ts`.
 - Manual check on the phone (Expo Go) before marking a feature ✅ in FEATURES.md.
-- Current suites (`__tests__/` next to the code): `xml`, `crypto`, `validate`, `client`, `hosts` (API); `redact`, `session` (security); `format` (utils). 57 tests.
+- Current suites (`__tests__/` next to the code): `xml`, `crypto`, `validate`, `client`, `hosts`, `monitoring`, `device`, `rsa`, `password`, `secret`, `reveal`, `wifi` (API); `redact`, `session` (security); `format`, `chart`, `usage`, `wifiQr` (utils). 120 tests.
 - Jest mock factories may only reference variables whose names start with `mock` (e.g. `const mockGet = jest.fn()`).
 - TypeScript 6 no longer auto-includes `@types/*`: `tsconfig.json` lists `"types": ["jest", "node"]`. Add new global type packages there.
 

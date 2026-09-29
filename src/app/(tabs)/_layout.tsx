@@ -14,7 +14,7 @@ const TABS: { name: string; title: string; icon: IconName; iconActive: IconName 
   { name: 'index', title: 'Home', icon: 'home-outline', iconActive: 'home' },
   { name: 'signal', title: 'Signal', icon: 'cellular-outline', iconActive: 'cellular' },
   { name: 'devices', title: 'Devices', icon: 'phone-portrait-outline', iconActive: 'phone-portrait' },
-  { name: 'messages', title: 'Messages', icon: 'chatbubble-outline', iconActive: 'chatbubble' },
+  { name: 'router', title: 'Router', icon: 'hardware-chip-outline', iconActive: 'hardware-chip' },
   { name: 'settings', title: 'Settings', icon: 'settings-outline', iconActive: 'settings' },
 ];
 

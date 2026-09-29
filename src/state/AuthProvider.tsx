@@ -11,9 +11,9 @@ import {
 } from 'react';
 import { AppState, View } from 'react-native';
 
-import { logout as apiLogout } from '@/api/auth';
+import { logout as apiLogout, changeAdminPassword } from '@/api/auth';
 import { routerClient } from '@/api/client';
-import { RouterError } from '@/api/errors';
+import { RouterError, isRouterError } from '@/api/errors';
 import {
   forgetPassword,
   loadRememberedPassword,
@@ -43,6 +43,11 @@ interface AuthContextValue {
   /** Returns false if the user cancelled the biometric prompt. */
   loginWithSaved: (username: string, acceptNewIdentity?: boolean) => Promise<boolean>;
   logout: () => Promise<void>;
+  /**
+   * Change the admin password. On success the router ends the session and the saved
+   * password (now wrong) is forgotten, so the user must log in again.
+   */
+  changePassword: (current: string, next: string) => Promise<void>;
   /** Called when the router says the session is gone (100003). */
   sessionExpired: () => void;
   /** Seconds the app-side limiter wants the user to wait. */
@@ -121,6 +126,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     endSession();
   }, [endSession]);
 
+  const changePassword = useCallback(
+    async (current: string, next: string) => {
+      try {
+        await changeAdminPassword(current, next);
+      } catch (e) {
+        // Like the web UI: too many wrong tries (108008) or a dead token end the session.
+        if (isRouterError(e, 'too_many_attempts') || isRouterError(e, 'bad_token') || isRouterError(e, 'login_required')) {
+          endSession();
+        }
+        throw e;
+      }
+      await forgetPassword().catch(() => undefined);
+      endSession();
+    },
+    [endSession],
+  );
+
   // Idle timeout + background timeout (AGENTS.md §8.3).
   useEffect(() => {
     if (status !== 'logged_in') return;
@@ -149,10 +171,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login: doLogin,
       loginWithSaved,
       logout,
+      changePassword,
       sessionExpired: endSession,
       limiterWait: () => limiter.waitSeconds(),
     }),
-    [status, doLogin, loginWithSaved, logout, endSession, limiter],
+    [status, doLogin, loginWithSaved, logout, changePassword, endSession, limiter],
   );
 
   return (

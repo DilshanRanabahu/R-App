@@ -131,4 +131,26 @@ describe('RouterClient', () => {
     await client.get('/api/b');
     expect(header(calls[2], 'Cookie')).toBeUndefined();
   });
+
+  it('sends encrypted bodies with the web UI content type', async () => {
+    const calls = mockFetch([
+      { body: sesTok('SES1', 'TOK1') },
+      { body: `${XML}<response>OK</response>` },
+    ]);
+    const client = new RouterClient();
+    await client.post('/api/x', { A: 'a&b' }, { encrypt: (xml) => `ENC(${xml})` });
+    expect(header(calls[1], 'Content-Type')).toBe('application/x-www-form-urlencoded; charset=UTF-8;enc');
+    expect(calls[1]?.init.body).toBe(`ENC(${XML}<request><A>a&amp;b</A></request>)`);
+  });
+
+  it('does not retry a bad token when asked not to', async () => {
+    const calls = mockFetch([
+      { body: sesTok('SES1', 'TOK1') },
+      { body: `${XML}<error><code>125002</code></error>` },
+    ]);
+    const client = new RouterClient();
+    const err = await client.post('/api/x', { A: 1 }, { retryBadToken: false }).catch((e: unknown) => e);
+    expect(isRouterError(err, 'bad_token')).toBe(true);
+    expect(calls).toHaveLength(2);
+  });
 });

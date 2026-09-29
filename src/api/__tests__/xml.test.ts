@@ -1,5 +1,5 @@
 import { isRouterError } from '../errors';
-import { buildRequest, escapeXml, parseResponse, toArray } from '../xml';
+import { buildRequest, escapeLikeWebUi, escapeXml, parseResponse, toArray } from '../xml';
 
 describe('escapeXml', () => {
   it('escapes all five XML special characters', () => {
@@ -66,5 +66,20 @@ describe('toArray', () => {
     expect(toArray('')).toEqual([]);
     expect(toArray({ a: 1 })).toEqual([{ a: 1 }]);
     expect(toArray([1, 2])).toEqual([1, 2]);
+  });
+});
+
+describe('escapeLikeWebUi', () => {
+  it("matches the router web UI's xss() byte for byte", () => {
+    expect(escapeLikeWebUi(`a&b'c"d<e>f/g(h)i`)).toBe(
+      'a&amp;b&#39;c&quot;d&lt;e&gt;f&#x2F;g&#40;h&#41;i',
+    );
+    expect(escapeLikeWebUi('plain-Pass_123')).toBe('plain-Pass_123');
+  });
+
+  it('can be used as the request escaping', () => {
+    expect(buildRequest({ p: 'x(1)' }, escapeLikeWebUi)).toBe(
+      '<?xml version="1.0" encoding="UTF-8"?><request><p>x&#40;1&#41;</p></request>',
+    );
   });
 });

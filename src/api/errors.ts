@@ -21,6 +21,8 @@ const CODE_KINDS: Record<string, RouterErrorKind> = {
   '108003': 'already_logged_in',
   '108006': 'wrong_password',
   '108007': 'too_many_attempts',
+  // Web UI: "Password entered incorrectly too many times." (admin password change; ends the session)
+  '108008': 'too_many_attempts',
   '125001': 'bad_token',
   '125002': 'bad_token',
   '125003': 'bad_token',

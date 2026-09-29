@@ -125,13 +125,13 @@ Bottom tab bar (height 64, white, top border), **5 tabs**:
 
 | Tab | Icon | Content |
 |---|---|---|
-| Home | `home` | Connection, speed, data, signal summary, quick actions |
+| Home | `home` | Connection, speed + chart, data used (owner's choice: no signal / device / mobile-data cards) |
 | Signal | `cellular` | Signal details, antenna mode |
 | Devices | `phone-portrait` | Connected devices |
-| Messages | `chatbubble` | SMS + USSD (segmented control at top) |
-| Settings | `settings` | Wi-Fi, data plan, network, system, app |
+| Router | `hardware-chip` | Everything that changes the router: status, mobile data, reboot; next Wi-Fi, admin password, data plan, auto reboot, blocked devices |
+| Settings | `settings` | The app only: account (log in/out), router address, version; later app lock |
 
-- Badge on **Messages** for unread SMS (small red pill with number).
+- The **Messages** tab (SMS + USSD) was dropped on 2026-09-29 (owner's choice) and replaced by **Router**.
 - Header: screen title (`title`) left, optional icon button right. No back button on tab roots.
 - Sub-screens (e.g. Wi-Fi settings) push with a normal header + back arrow.
 - Login opens as a full-screen modal.
@@ -165,13 +165,13 @@ Wireframes are at 384 dp width.
 │ │ Mobile data [●]││ 3 devices    › │ │  quick actions
 │ └────────────────┘└────────────────┘ │
 ├──────────────────────────────────────┤
-│  Home  Signal  Devices  Messages  ⚙  │
+│  Home  Signal  Devices  Router  ⚙    │
 └──────────────────────────────────────┘
 ```
 
-- Before login: speed + session data + operator show (no-login endpoints). Signal/devices cards show "Log in to see signal strength." with a Log in button.
+- The wireframe above was the original plan. The owner chose a simpler Home: **no Log in button, no signal card, no quick actions**. Signal and Devices have their own tabs; the mobile data switch lives in Settings → Data. Home works fully without login.
 - Pull to refresh.
-- **Phase 1 as built:** status chip (Online / Offline / Checking), subtitle "HUTCH · 4G" (adds "SIM not ready" if needed), speed card without the chart, **"Data used" card shows this session + connection time + lifetime total** (monthly usage, limit and progress bar come in Phase 2), signal card, and the two quick-action cards (mobile data switch, "N device(s)"). Quick actions only appear when logged in.
+- **Phase 1 as built:** status chip (Online / Offline / Checking), subtitle "HUTCH · 4G" (adds "SIM not ready" if needed), speed card with a **live chart of the last 60 s** (download blue line + soft fill, upload purple line, dot on the newest point; legend "● Download ● Upload"; speed axis on the left with the unit once on top ("Mbps"/"kbps") and values 0 / half / max on rounded 1-2-5 steps; time axis "60 s ago · 30 s ago · Now"; built from the 3 s traffic polling, memory only), **"Data used" card shows this session with a ↓ / ↑ split (blue / purple arrows, like the chart) + connection time + lifetime total**, then a **"Monthly usage" card**: "Today" and "This month" side by side, a note top-right ("Resets on the 1st", or "Since 26 Sep" when the router's counters were cleared after the month began), and either the plan progress bar with "93 % of your 60 GB plan · almost used up" (colour + words per §7) or "No monthly data plan is set on the router." Under the chart: **Top / Average** for the last minute in two columns aligned with Download / Upload. Nothing else: no Log in button, signal card or quick actions (log in from Settings, Signal or Devices).
 
 ### 9.2 Signal
 
@@ -222,15 +222,35 @@ Wireframes are at 384 dp width.
 - Sort: this phone first, then longest connected.
 - Device detail (Phase 2): nickname (editable), IP, MAC, connected time, **Block device** (danger button, disabled for "this phone" with explanation). Rows get a chevron once details exist.
 
-### 9.4 Messages
+### 9.4 Router
 
-- Segmented control at top: **SMS | USSD**.
-- **SMS:** list rows with sender, first line, time; unread = bold title + blue dot. Floating "New message" button bottom-right (above tab bar, 56 dp). Swipe or long-press → delete (confirm).
-- **USSD:** saved quick codes as list rows ("Check balance *#456#"), a code input + Send button, response shown in a card below. Sending always confirms first.
+Replaces the planned Messages tab. Grouped list like Settings (shared `ListGroup` component).
+
+```
+Router
+┌──────────────────────────────────────┐
+│ HUAWEI 4G Router 2s        ● Online  │  heading + status chip (same as Home)
+│ B312-926                             │  caption
+│ Running for 3 d 4 h · Firmware 11.x  │  caption, logged in only
+└──────────────────────────────────────┘
+Wi-Fi
+  Wi-Fi name & password          ›      → Wi-Fi screen
+Internet
+  Mobile data                  [●]      subtitle "Updating…" / "Off · no internet for any device"
+Security
+  Change admin password          ›      → change-password screen
+Danger zone                             red group title
+  Reboot router
+```
+
+- Logged out: status card + one card "Log in to manage your router: mobile data, reboot and more." with a Log in button.
+- **Change admin password** (sub-screen, back arrow + title, screenshot-blocked): Current / New (strength hint Weak · Medium · Strong + rules caption) / Confirm; "Change password" → dialog "Change admin password? You'll be logged out and must log in with the new password. If you forget it, the router has to be reset." → fingerprint/PIN → on success snackbar "Password changed. Log in with your new password." and the login screen opens (router ends the session; a saved password is forgotten). Wrong current password → inline "Current password is incorrect."; too many wrong tries (108008) → logged out.
+- **Wi-Fi screen** (sub-screen, screenshot-blocked): card "Your Wi-Fi" (Name, Security, Visible to others, Password `••••••••`) + **Show password** (fingerprint/PIN each time the screen opens); card "Share with guests" + **Show QR code** (fingerprint/PIN; dark-on-white QR, 232 dp); card "Change Wi-Fi": name, new password (empty = keep), confirm (appears when typing), "Hide network" switch, **Save changes** → dialog "Change Wi-Fi? Your phone will disconnect. Reconnect using the new password." → fingerprint/PIN. Caption: saving restarts Wi-Fi; cable devices stay connected. If the phone drops before the answer: snackbar "Your phone lost the Wi-Fi. The change was probably saved: reconnect with the new details."
+- **Next (planned):** Internet (monthly data plan, network mode), Security (blocked devices), Maintenance (automatic reboot, reboot router).
 
 ### 9.5 Settings
 
-Grouped list (group title in `label` + `textSecondary`). **Phase 1 as built:** Account (Log in / Log out, Forget saved password), App (Router address read-only, Version), Danger zone (Reboot router, only when logged in). Full target layout:
+Grouped list (group title in `label` + `textSecondary`). **As built:** only the app itself: Account (Log in / Log out, Forget saved password), App (Router address read-only, Version). Router controls moved to the Router tab (§9.4). The target layout below is kept for reference; its Wi-Fi / Data / Network / Router / Danger zone groups now belong in the Router tab:
 
 ```
 Wi-Fi
@@ -287,7 +307,7 @@ Every screen and card handles these; design them, don't leave blank screens.
 | Mobile data off | Dialog: "Turn off mobile data? All devices will lose internet until you turn it back on." (turning on needs no dialog) |
 | Change Wi-Fi name/password | Dialog: "Your phone will disconnect. Reconnect using the new password." |
 | Block device | Dialog with device name |
-| Send SMS / USSD | Dialog showing number/code (may cost money) |
+| Send SMS / USSD | (dropped with the Messages tab) Dialog showing number/code (may cost money) |
 | Factory reset | Two steps: dialog, then type `RESET` to enable the button |
 
 If the phone has no screen lock, actions that need fingerprint/PIN are blocked with a snackbar asking the user to set one.
@@ -323,7 +343,7 @@ After reboot: full-screen waiting screen ("Rebooting your router…", spinner). 
 - Tokens live in `src/theme/` (`colors.ts`, `typography.ts`, `spacing.ts`); components and screens use only tokens, no raw hex values.
 - `app.json`: `"userInterfaceStyle": "light"`, `backgroundColor #F5F7FA`; `expo-status-bar` with `style="dark"`.
 - `react-native-safe-area-context` for status/nav bar insets; the tab bar height is 64 dp + bottom inset.
-- Components built (`src/components/`): `AppText` (variants, `numeric` = tabular digits, hero numbers capped at 1.3× font scale), `Card`, `StatusChip`, `Button` (primary / secondary / danger / dangerFilled, loading), `ListRow`, `SignalBars`, `ProgressBar`, `Input` (label, error, secret with eye), `ConfirmDialog`, `EmptyState`, `LoginRequired`, `Skeleton`, `Screen` (title header + pull-to-refresh). Snackbar is in `src/state/SnackbarProvider.tsx`.
+- Components built (`src/components/`): `AppText` (variants, `numeric` = tabular digits, hero numbers capped at 1.3× font scale), `Card`, `StatusChip`, `Button` (primary / secondary / danger / dangerFilled, loading), `ListRow`, `ListGroup` (titled group of rows, used by Router + Settings), `SignalBars`, `SpeedChart` (SVG, monotone curve so it never dips below zero), `ProgressBar`, `Input` (label, error, secret with eye), `ConfirmDialog`, `EmptyState`, `LoginRequired`, `Skeleton`, `Screen` (title header + pull-to-refresh), `SubScreen` (back arrow + title for pushed screens), `QrCode` (one SVG path). Snackbar is in `src/state/SnackbarProvider.tsx`.
 - Signal bars use heights 40 / 60 / 80 / 100 % so even one bar reads as a bar.
 - Charts (Phase 2): one lightweight SVG line (`react-native-svg`), no chart library with heavy animations.
 - Keep a dark theme possible later by reading colors from the theme object, but **ship light only** for now.
@@ -346,11 +366,11 @@ After reboot: full-screen waiting screen ("Rebooting your router…", spinner). 
 | Screen / part | Status |
 |---|---|
 | Theme tokens, components | ✅ Built |
-| Home (9.1) | ✅ Built; monthly data card + speed chart in Phase 2 |
+| Home (9.1) | ✅ Built incl. speed chart; monthly data card in Phase 2 |
 | Signal (9.2) | ✅ Built; antenna mode in Phase 2 |
 | Devices (9.3) | ✅ Built (Wi-Fi + cable); detail screen in Phase 2 |
-| Messages (9.4) | ⬜ "Coming soon" empty state |
-| Settings (9.5) | 🔨 Phase 1 subset |
+| Router (9.4) | ✅ Status card, mobile data, reboot; more groups in Phase 2 |
+| Settings (9.5) | ✅ App only (account, router address, version) |
 | Login (9.6) | ✅ Built, screenshot-blocked |
 | States (10) | ✅ Built except "stale data" line |
 | Dangerous actions (11) | 🔨 Reboot + mobile data off built; others in Phase 2 |

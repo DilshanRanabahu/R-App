@@ -20,22 +20,61 @@ export function escapeXml(value: string): string {
     .replace(/'/g, '&apos;');
 }
 
-function element(name: string, value: XmlValue | undefined): string {
-  if (value === undefined) return '';
-  if (!TAG_NAME.test(name)) throw new Error(`Invalid XML tag name: ${name}`);
-  if (Array.isArray(value)) return value.map((v) => element(name, v)).join('');
-  if (typeof value === 'object') return `<${name}>${children(value)}</${name}>`;
-  return `<${name}>${escapeXml(String(value))}</${name}>`;
+/**
+ * The escaping the router's own web UI applies (its `xss()` helper). Used where we
+ * must send byte-for-byte what the web UI sends, e.g. the admin password change,
+ * so a password with ( ) / ' etc. ends up exactly as typed. Still XML-safe.
+ */
+export function escapeLikeWebUi(value: string): string {
+  const map: Record<string, string> = {
+    '&': '&amp;',
+    "'": '&#39;',
+    '"': '&quot;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '/': '&#x2F;',
+    '(': '&#40;',
+    ')': '&#41;',
+  };
+  return value.replace(/[&'"<>/()]/g, (c) => map[c] ?? c);
 }
 
-function children(obj: XmlObject): string {
+/**
+ * The Wi-Fi pages' own escaping (wificommon.js wifiEncode): like escapeLikeWebUi but
+ * with &apos; for '. Used for the Wi-Fi name / password so they arrive exactly as typed.
+ */
+export function escapeLikeWifiUi(value: string): string {
+  const map: Record<string, string> = {
+    '&': '&amp;',
+    "'": '&apos;',
+    '"': '&quot;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '/': '&#x2F;',
+    '(': '&#40;',
+    ')': '&#41;',
+  };
+  return value.replace(/[&'"<>/()]/g, (c) => map[c] ?? c);
+}
+
+type Escape = (value: string) => string;
+
+function element(name: string, value: XmlValue | undefined, escape: Escape): string {
+  if (value === undefined) return '';
+  if (!TAG_NAME.test(name)) throw new Error(`Invalid XML tag name: ${name}`);
+  if (Array.isArray(value)) return value.map((v) => element(name, v, escape)).join('');
+  if (typeof value === 'object') return `<${name}>${children(value, escape)}</${name}>`;
+  return `<${name}>${escape(String(value))}</${name}>`;
+}
+
+function children(obj: XmlObject, escape: Escape): string {
   return Object.entries(obj)
-    .map(([k, v]) => element(k, v))
+    .map(([k, v]) => element(k, v, escape))
     .join('');
 }
 
-export function buildRequest(body: XmlObject): string {
-  return `<?xml version="1.0" encoding="UTF-8"?><request>${children(body)}</request>`;
+export function buildRequest(body: XmlObject, escape: Escape = escapeXml): string {
+  return `<?xml version="1.0" encoding="UTF-8"?><request>${children(body, escape)}</request>`;
 }
 
 const parser = new XMLParser({

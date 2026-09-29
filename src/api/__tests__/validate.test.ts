@@ -2,6 +2,7 @@ import {
   isPrivateIPv4,
   normalizeMac,
   validateMac,
+  passwordStrength,
   validateNewAdminPassword,
   validatePhoneNumber,
   validateSmsText,
@@ -38,6 +39,8 @@ describe('validators', () => {
     expect(validateSsid('a'.repeat(33))).not.toBeNull();
     expect(validateSsid('é'.repeat(17))).not.toBeNull(); // 34 bytes
     expect(validateSsid('bad\nname')).not.toBeNull();
+    expect(validateSsid('Café')).not.toBeNull(); // this router: keyboard characters only
+    expect(validateSsid('My-Net_2.4 (home)')).toBeNull();
   });
 
   it('Wi-Fi key: 8–63 printable ASCII', () => {
@@ -45,6 +48,8 @@ describe('validators', () => {
     expect(validateWifiKey('short')).not.toBeNull();
     expect(validateWifiKey('a'.repeat(64))).not.toBeNull();
     expect(validateWifiKey('pässwörd1')).not.toBeNull();
+    expect(validateWifiKey(' leading1')).not.toBeNull();
+    expect(validateWifiKey('a'.repeat(63))).toBeNull();
   });
 
   it('phone numbers', () => {
@@ -77,5 +82,23 @@ describe('validators', () => {
     expect(validateNewAdminPassword('newpassword1', 'old')).toBeNull();
     expect(validateNewAdminPassword('short', 'old')).not.toBeNull();
     expect(validateNewAdminPassword('samepassword', 'samepassword')).not.toBeNull();
+  });
+});
+
+describe('validateNewAdminPassword (router rules)', () => {
+  it('allows keyboard characters only and no leading space', () => {
+    expect(validateNewAdminPassword('Fake-Pass(1)/x', 'old')).toBeNull();
+    expect(validateNewAdminPassword(' leadingspace', 'old')).not.toBeNull();
+    expect(validateNewAdminPassword('pässwörd123', 'old')).not.toBeNull();
+    expect(validateNewAdminPassword('tab	inside1', 'old')).not.toBeNull();
+    expect(validateNewAdminPassword('x'.repeat(33), 'old')).not.toBeNull();
+  });
+});
+
+describe('passwordStrength', () => {
+  it('rates length and character mix', () => {
+    expect(passwordStrength('abcdefgh')).toBe('weak');
+    expect(passwordStrength('abcdefg1')).toBe('medium');
+    expect(passwordStrength('Abcdefgh-123')).toBe('strong');
   });
 });

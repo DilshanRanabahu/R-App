@@ -22,17 +22,23 @@ export function validateRouterAddress(host: string): Validation {
   return isPrivateIPv4(host.trim()) ? null : 'Enter a local address like 192.168.8.1.';
 }
 
+/**
+ * Wi-Fi name, already trimmed (the router trims it too). This router allows keyboard
+ * characters only (chinesessid_enable=0, wifispecialcharenable=1), max 32.
+ */
 export function validateSsid(ssid: string): Validation {
   const len = utf8Length(ssid);
   if (len < 1) return 'Wi-Fi name is required.';
-  if (len > 32) return 'Wi-Fi name must be 32 bytes or less.';
-  if (/[\x00-\x1F\x7F]/.test(ssid)) return 'Wi-Fi name has invalid characters.';
+  if (len > 32) return 'Wi-Fi name must be 32 characters or less.';
+  if (!PRINTABLE_ASCII.test(ssid)) return 'Use only English letters, numbers, spaces and symbols.';
   return null;
 }
 
+/** WPA2 key: 8–63 keyboard characters, not starting with a space (router web UI rule). */
 export function validateWifiKey(key: string): Validation {
   if (key.length < 8 || key.length > 63) return 'Password must be 8–63 characters.';
-  if (!PRINTABLE_ASCII.test(key)) return 'Use letters, numbers and symbols only.';
+  if (!PRINTABLE_ASCII.test(key)) return 'Use only English letters, numbers and symbols.';
+  if (key.startsWith(' ')) return "Password can't start with a space.";
   return null;
 }
 
@@ -61,8 +67,24 @@ export function validateMac(mac: string): Validation {
   return /^([0-9A-F]{2}:){5}[0-9A-F]{2}$/.test(normalizeMac(mac)) ? null : 'Invalid MAC address.';
 }
 
+/**
+ * New admin password (AGENTS.md §8.2 + the router's own rules: 8+ characters,
+ * keyboard characters 32–126 only, must not start with a space).
+ */
 export function validateNewAdminPassword(next: string, current: string): Validation {
   if (next.length < 8 || next.length > 32) return 'Password must be 8–32 characters.';
-  if (next === current) return 'New password must be different.';
+  if (!PRINTABLE_ASCII.test(next)) return 'Use only English letters, numbers and symbols.';
+  if (next.startsWith(' ')) return "Password can't start with a space.";
+  if (next === current) return 'New password must be different from the current one.';
   return null;
+}
+
+export type PasswordStrength = 'weak' | 'medium' | 'strong';
+
+/** Strength hint only (not enforced): length + mix of lower, upper, digits, symbols. */
+export function passwordStrength(password: string): PasswordStrength {
+  const kinds = [/[a-z]/, /[A-Z]/, /[0-9]/, /[^a-zA-Z0-9]/].filter((r) => r.test(password)).length;
+  if (password.length >= 12 && kinds >= 3) return 'strong';
+  if (password.length >= 8 && kinds >= 2) return 'medium';
+  return 'weak';
 }

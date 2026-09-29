@@ -21,6 +21,8 @@ function AppStack() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="login" options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
       <Stack.Screen name="rebooting" options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
+      <Stack.Screen name="change-password" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="wifi" options={{ animation: 'slide_from_right' }} />
     </Stack>
   );
 }

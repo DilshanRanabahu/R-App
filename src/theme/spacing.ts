@@ -24,6 +24,11 @@ export const sizes = {
   iconSmall: 20,
   iconLarge: 48,
   progressBar: 8,
+  chart: 96,
+  chartStroke: 2,
+  chartDot: 4,
+  chartAxis: 36,
+  qrCode: 232,
 } as const;
 
 export const hairline = 1;

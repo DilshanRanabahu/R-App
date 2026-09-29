@@ -1,44 +1,40 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { router } from 'expo-router';
-import { useState } from 'react';
-import { StyleSheet, Switch, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
-import { userMessage } from '@/api/errors';
 import { AppText } from '@/components/AppText';
 import { Card } from '@/components/Card';
-import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { ProgressBar } from '@/components/ProgressBar';
 import { Screen } from '@/components/Screen';
-import { SignalBars } from '@/components/SignalBars';
-import { LoginRequired, Skeleton } from '@/components/States';
+import { SpeedChart } from '@/components/SpeedChart';
+import { Skeleton } from '@/components/States';
 import { StatusChip } from '@/components/StatusChip';
 import {
-  useHosts,
-  useMobileData,
+  useConnectionChip,
+  useDataPlan,
+  useMonthUsage,
   useOperator,
-  useSetMobileData,
-  useSignal,
   useSimReady,
   useStatus,
   useTraffic,
 } from '@/hooks/router';
 import { useManualRefresh } from '@/hooks/useManualRefresh';
 import { useScreenFocus } from '@/hooks/useScreenFocus';
+import { useSpeedHistory } from '@/hooks/useSpeedHistory';
 import { useAuth } from '@/state/AuthProvider';
-import { useSnackbar } from '@/state/SnackbarProvider';
-import { colors, sizes, space, type Tone } from '@/theme';
+import { colors, sizes, space, toneColors } from '@/theme';
 import { formatBytes, formatDuration, formatRate, joinUnit, type ValueWithUnit } from '@/utils/format';
-import { RATING_LABEL, overallRating } from '@/utils/signal';
+import { usageNote, usageTone } from '@/utils/usage';
 
 function BigStat({ label, icon, value, color }: {
   label: string;
-  icon: 'arrow-down' | 'arrow-up';
+  icon?: 'arrow-down' | 'arrow-up';
   value: ValueWithUnit | null;
-  color: string;
+  color?: string;
 }) {
   return (
     <View style={styles.stat}>
       <View style={styles.statLabel}>
-        <Ionicons name={icon} size={sizes.iconSmall} color={color} />
+        {icon && <Ionicons name={icon} size={sizes.iconSmall} color={color} />}
         <AppText variant="label" color={colors.textSecondary}>
           {label}
         </AppText>
@@ -59,55 +55,60 @@ function BigStat({ label, icon, value, color }: {
   );
 }
 
+/** "↓ 1.3 GB" in the same colours as the speed chart. */
+function Direction({ icon, color, name, bytes }: {
+  icon: 'arrow-down' | 'arrow-up';
+  color: string;
+  name: string;
+  bytes: number;
+}) {
+  const value = joinUnit(formatBytes(bytes));
+  return (
+    <View style={styles.direction} accessible accessibilityLabel={`${name} ${value}`}>
+      <Ionicons name={icon} size={sizes.iconSmall} color={color} />
+      <AppText variant="label" numeric>
+        {value}
+      </AppText>
+    </View>
+  );
+}
+
 export default function HomeScreen() {
   const focused = useScreenFocus();
   const { status: auth } = useAuth();
   const loggedIn = auth === 'logged_in';
-  const snackbar = useSnackbar();
 
   const traffic = useTraffic(focused);
+  const speedHistory = useSpeedHistory(traffic.data, traffic.dataUpdatedAt);
+  const monthUsage = useMonthUsage(focused);
+  const dataPlan = useDataPlan(focused);
   const operator = useOperator(focused);
   const simReady = useSimReady();
   const status = useStatus(focused);
-  const signal = useSignal(focused);
-  const hosts = useHosts(focused);
-  const mobileData = useMobileData();
-  const setMobileData = useSetMobileData();
-  const [confirmDataOff, setConfirmDataOff] = useState(false);
+  const chip = useConnectionChip(focused);
 
   const t = traffic.data;
-  const connected = status.data
-    ? status.data.connection === 'connected'
-    : t
-      ? t.connectSeconds > 0
-      : undefined;
-  const chip: { tone: Tone; label: string } =
-    connected === undefined
-      ? { tone: 'neutral', label: 'Checking' }
-      : connected
-        ? { tone: 'success', label: 'Online' }
-        : { tone: 'danger', label: 'Offline' };
-
   const subtitleParts = [
     operator.data?.name,
     operator.data?.generation !== 'Unknown' ? operator.data?.generation : undefined,
     simReady.data === false ? 'SIM not ready' : undefined,
   ].filter(Boolean);
 
-  const rating = signal.data ? overallRating(signal.data.rsrp, signal.data.sinr) : 'unknown';
-
-  const toggleData = (next: boolean) => {
-    if (!next) {
-      setConfirmDataOff(true);
-      return;
-    }
-    setMobileData.mutate(true, { onError: (e) => snackbar.show(userMessage(e)) });
-  };
+  const month = monthUsage.data;
+  const plan = dataPlan.data;
+  const monthUsed = month ? month.download + month.upload : 0;
+  const planFraction = plan?.limitBytes ? monthUsed / plan.limitBytes : null;
+  const planTone = planFraction === null ? 'primary' : usageTone(planFraction);
+  // Status also in words, never by colour alone (DESIGN.md §3).
+  const planWords =
+    planFraction === null ? '' : planFraction > 1 ? ' · over your plan' : planFraction >= 0.8 ? ' · almost used up' : '';
 
   const { refreshing, onRefresh } = useManualRefresh(() => [
     traffic.refetch(),
+    monthUsage.refetch(),
+    dataPlan.refetch(),
     operator.refetch(),
-    ...(loggedIn ? [status.refetch(), signal.refetch(), hosts.refetch(), mobileData.refetch()] : []),
+    ...(loggedIn ? [status.refetch()] : []),
   ]);
 
   return (
@@ -123,6 +124,7 @@ export default function HomeScreen() {
           <BigStat label="Download" icon="arrow-down" color={colors.primary} value={t ? formatRate(t.downloadRate) : null} />
           <BigStat label="Upload" icon="arrow-up" color={colors.info} value={t ? formatRate(t.uploadRate) : null} />
         </View>
+        <SpeedChart samples={speedHistory} />
       </Card>
 
       <Card title="Data used">
@@ -136,6 +138,10 @@ export default function HomeScreen() {
                 {formatBytes(t.sessionDownload + t.sessionUpload).unit} this session
               </AppText>
             </View>
+            <View style={styles.directions}>
+              <Direction icon="arrow-down" color={colors.primary} name="Downloaded" bytes={t.sessionDownload} />
+              <Direction icon="arrow-up" color={colors.info} name="Uploaded" bytes={t.sessionUpload} />
+            </View>
             <AppText variant="caption" color={colors.textSecondary} numeric>
               Connected {formatDuration(t.connectSeconds)} · Total{' '}
               {joinUnit(formatBytes(t.totalDownload + t.totalUpload))}
@@ -147,81 +153,39 @@ export default function HomeScreen() {
       </Card>
 
       <Card
-        title="Signal"
-        onPress={loggedIn ? () => router.navigate('/signal') : undefined}
-        accessibilityLabel={`Signal ${RATING_LABEL[rating]}. Open signal details`}
+        title="Monthly usage"
         right={
-          loggedIn && signal.data ? (
-            <View style={styles.inline}>
-              <SignalBars rating={rating} />
-              <AppText variant="label">{RATING_LABEL[rating]}</AppText>
-              <Ionicons name="chevron-forward" size={sizes.iconSmall} color={colors.textMuted} />
-            </View>
+          month && plan ? (
+            <AppText variant="caption" color={colors.textMuted}>
+              {usageNote(plan.startDay, month.lastCleared, new Date())}
+            </AppText>
           ) : undefined
         }
       >
-        {!loggedIn ? (
-          <LoginRequired message="Log in to see signal strength." />
-        ) : signal.data ? (
-          <AppText variant="caption" color={colors.textSecondary} numeric>
-            RSRP {signal.data.rsrp ?? '–'} dBm · SINR {signal.data.sinr ?? '–'} dB
-          </AppText>
-        ) : (
-          <Skeleton width={180} />
-        )}
-      </Card>
-
-      {loggedIn && (
-        <View style={styles.quickRow}>
-          <Card style={styles.quick}>
-            <View style={styles.quickInner}>
-              <AppText variant="label" color={colors.textSecondary} style={styles.flex}>
-                Mobile data
-              </AppText>
-              <Switch
-                value={mobileData.data ?? false}
-                disabled={mobileData.data === undefined || setMobileData.isPending}
-                onValueChange={toggleData}
-                trackColor={{ true: colors.primary, false: colors.border }}
-                thumbColor={colors.surface}
-                accessibilityLabel="Mobile data"
-              />
-            </View>
-            {setMobileData.isPending && (
-              <AppText variant="caption" color={colors.textMuted}>
-                Updating…
-              </AppText>
-            )}
-          </Card>
-          <Card
-            style={styles.quick}
-            onPress={() => router.navigate('/devices')}
-            accessibilityLabel="Connected devices"
-          >
-            <View style={styles.quickInner}>
-              <AppText variant="label" color={colors.textSecondary} style={styles.flex} numeric>
-                {hosts.data
-                  ? `${hosts.data.length} ${hosts.data.length === 1 ? 'device' : 'devices'}`
-                  : 'Devices'}
-              </AppText>
-              <Ionicons name="chevron-forward" size={sizes.iconSmall} color={colors.textMuted} />
-            </View>
-          </Card>
+        <View style={styles.statRow}>
+          <BigStat label="Today" value={month ? formatBytes(month.today) : null} />
+          <BigStat label="This month" value={month ? formatBytes(monthUsed) : null} />
         </View>
-      )}
-
-      <ConfirmDialog
-        visible={confirmDataOff}
-        title="Turn off mobile data?"
-        message="All devices will lose internet until you turn it back on."
-        confirmLabel="Turn off"
-        destructive
-        onCancel={() => setConfirmDataOff(false)}
-        onConfirm={() => {
-          setConfirmDataOff(false);
-          setMobileData.mutate(false, { onError: (e) => snackbar.show(userMessage(e)) });
-        }}
-      />
+        {month && plan ? (
+          plan.limitBytes && planFraction !== null ? (
+            <View style={styles.plan}>
+              <ProgressBar value={planFraction} color={toneColors(planTone).fg} />
+              <AppText
+                variant="caption"
+                color={planTone === 'primary' ? colors.textSecondary : toneColors(planTone).fg}
+                numeric
+              >
+                {Math.round(planFraction * 100)} % of your {joinUnit(formatBytes(plan.limitBytes))} plan
+                {planWords}
+              </AppText>
+            </View>
+          ) : (
+            <AppText variant="caption" color={colors.textMuted}>
+              No monthly data plan is set on the router.
+            </AppText>
+          )
+        ) : null}
+      </Card>
     </Screen>
   );
 }
@@ -231,9 +195,7 @@ const styles = StyleSheet.create({
   stat: { flex: 1, gap: space.xs },
   statLabel: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
   valueRow: { flexDirection: 'row', alignItems: 'baseline', gap: space.xs },
-  inline: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  quickRow: { flexDirection: 'row', gap: space.md },
-  quick: { flex: 1, paddingVertical: space.md },
-  quickInner: { flexDirection: 'row', alignItems: 'center', minHeight: sizes.touchTarget - space.md },
-  flex: { flex: 1 },
+  directions: { flexDirection: 'row', gap: space.lg },
+  direction: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
+  plan: { gap: space.sm },
 });
