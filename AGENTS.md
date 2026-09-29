@@ -317,5 +317,5 @@ Security modules are built **first**, not added later.
 - Remote: **https://github.com/DilshanRanabahu/R-App** (branch `main`). The repository is **public**.
 - **Nothing personal in the repo:** no passwords, tokens, Wi-Fi name, adb serial, IMEI/IMSI, phone numbers, MACs, real device names or SMS text, in code, docs, tests or commit messages. Use placeholders (`<serial>`, "Galaxy-A06", "My-Laptop"). Scan the staged diff for these before every commit.
 - `.gitignore` covers `node_modules/`, `.expo/`, `dist/`, `/android`, `/ios`, `*.keystore`, `*.jks`, `.env*`, `credentials.json`, `google-services.json`, `*.log`, `router-dumps/`, `*.router.xml`. Keep it that way.
-- Commit and push only when the user asks. Work on a branch for bigger changes; end commit messages with the co-author line.
+- Commit and push only when the user asks. Work on a branch for bigger changes. **Do not add any Claude / AI co-author or "Generated with" lines** to commits or PRs; the owner is the only contributor.
 - Never commit secrets or unsanitized router data. If one is committed by mistake, stop and tell the user (history must be cleaned and the password changed).
