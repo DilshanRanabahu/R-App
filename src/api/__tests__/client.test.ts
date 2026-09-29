@@ -1,4 +1,4 @@
-import { RouterClient } from '../client';
+import { RouterClient, isFromHost } from '../client';
 import { isRouterError } from '../errors';
 
 // Fake values only; no real session data in fixtures (AGENTS.md §9).
@@ -11,19 +11,36 @@ interface Call {
   init: RequestInit;
 }
 
-function mockFetch(responses: { body: string; headers?: Record<string, string> }[]) {
+function mockFetch(responses: { body: string; headers?: Record<string, string>; url?: string }[]) {
   const calls: Call[] = [];
   global.fetch = jest.fn(async (url: string, init: RequestInit) => {
     calls.push({ url, init });
     const next = responses.shift();
     if (!next) throw new Error('unexpected request');
-    return new Response(next.body, { headers: next.headers });
+    const res = new Response(next.body, { headers: next.headers });
+    // Where the request finally landed (after redirects), as the platform reports it.
+    if (next.url !== undefined) Object.defineProperty(res, 'url', { value: next.url });
+    return res;
   }) as unknown as typeof fetch;
   return calls;
 }
 
 const header = (c: Call | undefined, name: string) =>
   (c?.init.headers as Record<string, string>)[name];
+
+describe('isFromHost', () => {
+  it('accepts only plain HTTP on the router host, port 80', () => {
+    expect(isFromHost('', '192.168.8.1')).toBe(true);
+    expect(isFromHost('http://192.168.8.1/api/x', '192.168.8.1')).toBe(true);
+    expect(isFromHost('http://192.168.8.1:80/html/index.html', '192.168.8.1')).toBe(true);
+    expect(isFromHost('http://192.168.8.1', '192.168.8.1')).toBe(true);
+    expect(isFromHost('https://192.168.8.1/api/x', '192.168.8.1')).toBe(false);
+    expect(isFromHost('http://192.168.8.1:8080/api/x', '192.168.8.1')).toBe(false);
+    expect(isFromHost('http://192.168.8.10/api/x', '192.168.8.1')).toBe(false);
+    expect(isFromHost('http://192.168.8.1.evil.example/x', '192.168.8.1')).toBe(false);
+    expect(isFromHost('http://evil.example/?h=192.168.8.1', '192.168.8.1')).toBe(false);
+  });
+});
 
 describe('RouterClient', () => {
   it('refuses non-private router addresses', () => {
@@ -130,6 +147,34 @@ describe('RouterClient', () => {
     client.clearSession();
     await client.get('/api/b');
     expect(header(calls[2], 'Cookie')).toBeUndefined();
+  });
+
+  it('rejects answers that were redirected away from the router, and ignores their cookies', async () => {
+    const calls = mockFetch([
+      {
+        body: sesTok('EVIL', 'EVILTOK'),
+        headers: { 'Set-Cookie': 'SessionID=EVIL2;' },
+        url: 'https://evil.example/api/webserver/SesTokInfo',
+      },
+      { body: sesTok('S1', 'T1') },
+      { body: `${XML}<response>OK</response>` },
+    ]);
+    const client = new RouterClient();
+    const err = await client.get('/api/webserver/SesTokInfo').catch((e: unknown) => e);
+    expect(isRouterError(err, 'invalid_response')).toBe(true);
+    await client.post('/api/x', {});
+    expect(header(calls[2], 'Cookie')).toBe('SessionID=S1');
+  });
+
+  it('accepts answers from the router itself', async () => {
+    mockFetch([{ body: `${XML}<response><A>1</A></response>`, url: 'http://192.168.8.1/api/a' }]);
+    await expect(new RouterClient().get('/api/a')).resolves.toEqual({ A: '1' });
+  });
+
+  it('refuses oversized answers before reading them', async () => {
+    mockFetch([{ body: `${XML}<response>OK</response>`, headers: { 'Content-Length': '2000000' } }]);
+    const err = await new RouterClient().get('/api/x').catch((e: unknown) => e);
+    expect(isRouterError(err, 'invalid_response')).toBe(true);
   });
 
   it('sends encrypted bodies with the web UI content type', async () => {

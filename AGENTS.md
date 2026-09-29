@@ -226,6 +226,9 @@ Layer rule: `src/app/` → `hooks/` + `state/` → `api/` + `security/`. Screens
   - Both show "This doesn't look like your router" with **Cancel** (default) / **Trust new router** (requires device re-auth).
   - Not yet verified: whether the public key survives a router reboot or firmware update. If it changes, users will see a false warning and must re-trust.
 - Never send any router data (tokens, hashes, SMS, IMEI, IMSI, MACs) to any host other than the configured router address.
+- **Secrets are only ever encrypted with the pinned router's key:** admin password change, Wi-Fi password change and Wi-Fi password reveal get the RSA key through `trustedPublicKey()` (`routerIdentity.ts`), which refuses a key that doesn't match the pre-login pin (`identity_mismatch`).
+- **Redirects:** React Native follows HTTP redirects and can't be told not to. `client.ts` rejects any response whose final URL isn't `http://<router>` (port 80) before using its cookies, tokens or body (`isFromHost`), and refuses responses with `Content-Length` over 1 MB before downloading them.
+- **Deep links** can open any screen. Screens must not act on open: `rebooting.tsx` only runs within 60 s of a reboot the user confirmed (`state/rebootGate.ts`); otherwise it redirects home.
 
 ### 8.6 Network
 
@@ -310,14 +313,16 @@ Security modules are built **first**, not added later.
 - Unit tests (Jest) with **mocked** router responses for: password hash, token rotation, request queue, XML escaping/parsing, error mapping, all validators, redaction, router address validation, fingerprint check, session timeout, lockout handling.
 - Security tests are required for every function in `src/security/` and `src/api/xml.ts`/`validate.ts`.
 - Manual check on the phone (Expo Go) before marking a feature ✅ in FEATURES.md.
-- Current suites (`__tests__/` next to the code): `xml`, `crypto`, `validate`, `client`, `hosts`, `monitoring`, `device`, `rsa`, `password`, `secret`, `reveal`, `wifi` (API); `redact`, `session` (security); `format`, `chart`, `usage`, `wifiQr` (utils). 120 tests.
+- Current suites (`__tests__/` next to the code): `xml`, `crypto`, `validate`, `client`, `hosts`, `monitoring`, `device`, `rsa`, `password`, `secret`, `reveal`, `wifi` (API); `redact`, `session`, `routerIdentity`, `rebootGate` (security); `format`, `chart`, `usage`, `wifiQr` (utils). 133 tests.
 - Jest mock factories may only reference variables whose names start with `mock` (e.g. `const mockGet = jest.fn()`).
 - TypeScript 6 no longer auto-includes `@types/*`: `tsconfig.json` lists `"types": ["jest", "node"]`. Add new global type packages there.
 
 ## 12a. Known issues & open questions
 
 - **Router public key across reboots:** stable between requests, not verified across reboot/firmware update. If it changes, users see the "not your router" warning and must re-trust.
-- **`npm audit`:** 13 moderate issues, all in Expo build tooling (`@expo/config-plugins` chain), not shipped in the app. Recheck before release; don't run `npm audit fix --force`.
+- **Pre-login pin uses public data** (device name + RSA public key, readable by anyone on the LAN), so a determined attacker on the LAN can copy it. It stops accidental wrong routers and lazy look-alikes, not a targeted LAN attacker; on plain-HTTP HiLink, a LAN man-in-the-middle can always see the session. The post-login pin (serial + MAC) and the key check above limit the damage.
+- **Open decisions (security review 2026-09-29):** saved password is not wiped on manual logout or on `108007` (§8.2/§8.3 say it should — owner to decide); login and change-password screens keep the typed password in screen state until the screen closes (§8.2 says no React state).
+- **`npm audit`:** 13 moderate. 12 are Expo build tooling (`@expo/config-plugins` → `xcode` → `uuid`), not shipped. **One ships in the app:** `expo-router` → `query-string` → `decode-uri-component` (GHSA-vcc3-ghjq-m6fr, DoS on a crafted percent-encoded link). Low risk (a malicious `rapp://` link could freeze the app). Update Expo patch releases (`npx expo install --check`) and re-audit before release; don't run `npm audit fix --force`.
 - **Signal is poor** at the router's current spot (RSRP ≈ −105 dBm), which makes antenna positioning mode (FEATURES 3.4) high-value.
 - The admin password was shared in plain text early in the project; remind the user to change it (FEATURES 1.9 will make that possible in-app).
 

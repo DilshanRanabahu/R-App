@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,6 +7,7 @@ import { getBasicInformation } from '@/api/endpoints/device';
 import { AppText } from '@/components/AppText';
 import { Button } from '@/components/Button';
 import { useAuth } from '@/state/AuthProvider';
+import { clearRebootRequested, isRebootRequested } from '@/state/rebootGate';
 import { colors, space } from '@/theme';
 
 const FIRST_CHECK_MS = 20_000;
@@ -15,8 +16,17 @@ const GIVE_UP_MS = 4 * 60_000;
 
 type Phase = 'waiting' | 'back' | 'slow';
 
-/** Waits for the router to come back after a reboot (DESIGN.md §11). */
+/**
+ * Waits for the router to come back after a reboot (DESIGN.md §11). Only works right
+ * after a reboot the user confirmed; opened any other way (deep link) it goes home.
+ */
 export default function RebootingScreen() {
+  const [allowed] = useState(() => isRebootRequested());
+  if (!allowed) return <Redirect href="/" />;
+  return <Waiting />;
+}
+
+function Waiting() {
   const { sessionExpired } = useAuth();
   const [phase, setPhase] = useState<Phase>('waiting');
   const startedAt = useRef(0);
@@ -48,7 +58,10 @@ export default function RebootingScreen() {
     };
   }, [sessionExpired]);
 
-  const done = () => router.dismissTo('/');
+  const done = () => {
+    clearRebootRequested();
+    router.dismissTo('/');
+  };
 
   return (
     <SafeAreaView style={styles.safe}>

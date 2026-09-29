@@ -1,6 +1,7 @@
 import { routerClient } from './client';
 import { loginPasswordHash, rsaEncryptHex } from './crypto';
-import { getPublicKey } from './endpoints/device';
+import { trustedPublicKey } from '@/security/routerIdentity';
+
 import { toNumber } from './endpoints/parse';
 import { RouterError } from './errors';
 import type { LoginState, LoginStateRaw } from './types';
@@ -46,14 +47,13 @@ export async function logout(): Promise<void> {
 /**
  * Change the admin password exactly like the router's own web UI (emui webui 6):
  * POST user/password_scram with username / currentpassword / newpassword, values
- * escaped like the UI's xss(), the whole XML RSA-encrypted with the router's key.
+ * escaped like the UI's xss(), the whole XML RSA-encrypted with the router's key —
+ * only the key of the router pinned at login (trustedPublicKey).
  * Never retried: a repeat could count as another wrong attempt (108008 locks you out).
  * The router ends the session afterwards, so the caller must log out locally.
  */
 export async function changeAdminPassword(current: string, next: string): Promise<void> {
-  const [state, key] = await Promise.all([getLoginState(), getPublicKey()]);
-  if (!key.encpubkeyn || !key.encpubkeye) throw new RouterError('invalid_response');
-  const publicKey = { n: key.encpubkeyn, e: key.encpubkeye };
+  const [state, publicKey] = await Promise.all([getLoginState(), trustedPublicKey()]);
   await routerClient.post(
     '/api/user/password_scram',
     // The web UI always changes the "admin" account.

@@ -16,6 +16,18 @@ const SENSITIVE_TAGS = [
   'Phone',
   'Content',
   'WifiWpapsk',
+  'MixWifiWpapsk',
+  'WifiWepKey1',
+  'WifiWepKey2',
+  'WifiWepKey3',
+  'WifiWepKey4',
+  'WifiRadiusKey',
+  'WifiSsid',
+  'currentpassword',
+  'newpassword',
+  'nonce',
+  'pwd',
+  'hash',
   'encpubkeyn',
 ];
 

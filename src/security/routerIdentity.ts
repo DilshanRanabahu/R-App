@@ -1,6 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 
 import { sha256Hex } from '@/api/crypto';
+import { RouterError } from '@/api/errors';
 import { getBasicInformation, getDeviceInformation, getPublicKey } from '@/api/endpoints/device';
 
 // Router fingerprint pinning (AGENTS.md §8.5). Only hashes are stored.
@@ -23,9 +24,30 @@ async function compare(key: string, fingerprint: string): Promise<PinResult> {
   return saved === fingerprint ? 'match' : 'mismatch';
 }
 
+function keyFingerprint(deviceName: string, n: string, e: string): Promise<string> {
+  return sha256Hex(`${deviceName}|${n}|${e}`);
+}
+
 export async function preLoginFingerprint(): Promise<string> {
   const [{ deviceName }, key] = await Promise.all([getBasicInformation(), getPublicKey()]);
-  return sha256Hex(`${deviceName}|${key.encpubkeyn ?? ''}|${key.encpubkeye ?? ''}`);
+  return keyFingerprint(deviceName, key.encpubkeyn ?? '', key.encpubkeye ?? '');
+}
+
+/**
+ * The router's RSA key, but only if it matches the router pinned at login. Every secret
+ * we encrypt (admin / Wi-Fi password, reveal secrets) uses this, so a look-alike router
+ * that hands out its own key gets nothing it can decrypt (AGENTS.md §8.5).
+ */
+export async function trustedPublicKey(): Promise<{ n: string; e: string }> {
+  const [{ deviceName }, key] = await Promise.all([getBasicInformation(), getPublicKey()]);
+  const n = key.encpubkeyn ?? '';
+  const e = key.encpubkeye ?? '';
+  if (!n || !e) throw new RouterError('invalid_response');
+  const pinned = await SecureStore.getItemAsync(PRE_KEY, OPTS);
+  if (!pinned || pinned !== (await keyFingerprint(deviceName, n, e))) {
+    throw new RouterError('identity_mismatch');
+  }
+  return { n, e };
 }
 
 export async function postLoginFingerprint(): Promise<string> {

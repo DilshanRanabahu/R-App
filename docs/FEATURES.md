@@ -24,7 +24,7 @@ A React Native (Expo) app for managing a Huawei B312-926 (HUAWEI 4G Router 2s) f
 | Built, not yet exercised | Logout, remember password, session expiry / idle logout, mobile data **switching**, reboot + waiting screen, "Trust new router" flow |
 | Security built | Router fingerprint pinning, encrypted password storage (opt-in), login attempt limiter, idle/background logout, screenshot blocking, device re-auth for risky actions, cleartext only to the router, log redaction |
 | App icon | Designed and generated (`assets/`); visible only after a standalone build |
-| Tests | 120 unit tests passing; type check + lint clean |
+| Tests | 133 unit tests passing; type check + lint clean |
 
 ## Legend
 

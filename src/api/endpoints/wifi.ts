@@ -4,7 +4,8 @@ import { decryptSecretReply, newSecretExchange, rsaEncryptHex } from '../crypto'
 import { RouterError } from '../errors';
 import type { SecretReplyRaw, WifiBasicRaw, WifiNetwork, WifiSsidRaw } from '../types';
 import { escapeLikeWifiUi, parseResponse, toArray } from '../xml';
-import { getPublicKey } from './device';
+import { trustedPublicKey } from '@/security/routerIdentity';
+
 import { decodeCharRefs, toNumber } from './parse';
 
 /** The main 2.4 GHz network is Radio 1 / SSID 1; SSID 2 is the guest network. */
@@ -12,10 +13,10 @@ export function isMainSsid(s: WifiSsidRaw): boolean {
   return (s.ID ?? '').includes('Radio.1.Ssid.1.') || (s.ID === undefined && s.Index === '0');
 }
 
+/** RSA key + padding for secrets; the key must match the router pinned at login. */
 async function routerKey() {
-  const [state, key] = await Promise.all([getLoginState(), getPublicKey()]);
-  if (!key.encpubkeyn || !key.encpubkeye) throw new RouterError('invalid_response');
-  return { key: { n: key.encpubkeyn, e: key.encpubkeye }, padding: state.rsaPadding };
+  const [state, key] = await Promise.all([getLoginState(), trustedPublicKey()]);
+  return { key, padding: state.rsaPadding };
 }
 
 export interface WifiChange {

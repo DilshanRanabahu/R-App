@@ -13,6 +13,10 @@ jest.mock('../crypto', () => ({
   rsaEncryptHex: (plain: string) => plain,
 }));
 
+jest.mock('@/security/routerIdentity', () => ({
+  trustedPublicKey: async () => ({ n: 'ab', e: '03' }),
+}));
+
 const mockGet = jest.fn();
 const mockPost = jest.fn();
 jest.mock('../client', () => ({
@@ -43,9 +47,7 @@ function routerReply(secrets: string) {
 }
 
 beforeEach(() => {
-  mockGet.mockImplementation(async (path: string) =>
-    path === '/api/user/state-login' ? { rsapadingtype: '1' } : { encpubkeyn: 'ab', encpubkeye: '03' },
-  );
+  mockGet.mockImplementation(async () => ({ rsapadingtype: '1' }));
   mockPost.mockImplementation(async (_path: string, body: { nonce: string }) => routerReply(body.nonce));
 });
 

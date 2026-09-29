@@ -1,6 +1,6 @@
 import { RouterError, isRouterError } from './errors';
 import { isPrivateIPv4 } from './validate';
-import { buildRequest, parseResponse, type XmlObject } from './xml';
+import { MAX_RESPONSE_BYTES, buildRequest, parseResponse, type XmlObject } from './xml';
 
 export const DEFAULT_ROUTER_HOST = '192.168.8.1';
 const TIMEOUT_MS = 8000;
@@ -19,6 +19,16 @@ export interface PostOptions {
    * (Wi-Fi settings). Ignored when `encrypt` is set, which always sends ";enc".
    */
   typeSuffix?: string;
+}
+
+/**
+ * True if a response URL is plain HTTP on the router host, port 80. An empty URL
+ * (the platform didn't report one) is accepted: nothing was redirected.
+ */
+export function isFromHost(url: string, host: string): boolean {
+  if (!url) return true;
+  const m = /^http:\/\/([^/:?#]+)(?::(\d+))?(?:[/?#]|$)/i.exec(url);
+  return !!m && m[1]?.toLowerCase() === host.toLowerCase() && (m[2] === undefined || m[2] === '80');
 }
 
 const FORM_TYPE = 'application/x-www-form-urlencoded; charset=UTF-8';
@@ -164,6 +174,15 @@ export class RouterClient {
         credentials: 'omit',
         signal: controller.signal,
       });
+      // React Native follows redirects by itself and can't be told not to. An answer that
+      // ended up anywhere but the router (a look-alike router redirecting elsewhere) is
+      // rejected before its cookies, tokens or body are used (AGENTS.md §8.5).
+      if (!isFromHost(res.url, this.host)) throw new RouterError('invalid_response');
+      // Don't even download oversized answers; xml.ts checks the size again.
+      if (Number(res.headers.get('content-length')) > MAX_RESPONSE_BYTES) {
+        controller.abort();
+        throw new RouterError('invalid_response');
+      }
       this.captureHeaders(res.headers);
       return { text: await res.text(), headers: res.headers };
     } catch (e) {

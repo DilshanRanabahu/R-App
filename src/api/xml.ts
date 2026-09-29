@@ -2,7 +2,7 @@ import { XMLParser } from 'fast-xml-parser';
 
 import { RouterError } from './errors';
 
-const MAX_RESPONSE_BYTES = 1_000_000;
+export const MAX_RESPONSE_BYTES = 1_000_000;
 const TAG_NAME = /^[A-Za-z_][A-Za-z0-9_.-]*$/;
 
 export type XmlValue = string | number | boolean | XmlObject | XmlValue[];

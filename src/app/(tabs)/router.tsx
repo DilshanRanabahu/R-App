@@ -23,6 +23,7 @@ import { useManualRefresh } from '@/hooks/useManualRefresh';
 import { useScreenFocus } from '@/hooks/useScreenFocus';
 import { NO_LOCK_MESSAGE, requireDeviceAuth } from '@/security/deviceAuth';
 import { useAuth } from '@/state/AuthProvider';
+import { markRebootRequested } from '@/state/rebootGate';
 import { useSnackbar } from '@/state/SnackbarProvider';
 import { colors, space } from '@/theme';
 import { formatDuration } from '@/utils/format';
@@ -55,7 +56,10 @@ export default function RouterScreen() {
     if (auth === 'no_lock') return snackbar.show(NO_LOCK_MESSAGE);
     if (auth !== 'ok') return;
     reboot.mutate(undefined, {
-      onSuccess: () => router.push('/rebooting'),
+      onSuccess: () => {
+        markRebootRequested();
+        router.push('/rebooting');
+      },
       onError: (e) => snackbar.show(userMessage(e)),
     });
   };

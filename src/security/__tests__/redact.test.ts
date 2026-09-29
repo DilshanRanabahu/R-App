@@ -12,8 +12,20 @@ describe('redact', () => {
 
   it('removes cookies, tokens, MACs and phone numbers in free text', () => {
     const out = redact(
-      'Cookie SessionID=XYZ; __RequestVerificationToken: TOK mac 7E:42:AE:06:19:D3 call +94771234567',
+      'Cookie SessionID=XYZ; __RequestVerificationToken: TOK mac AA:BB:CC:00:11:22 call +94770000000',
     );
-    expect(out).not.toMatch(/XYZ|TOK\b|7E:42|94771234567/);
+    expect(out).not.toMatch(/XYZ|TOK\b|AA:BB|94770000000/);
+  });
+
+  it('removes admin / Wi-Fi passwords, Wi-Fi name and key-exchange values', () => {
+    const out = redact(
+      '<request><username>admin</username><currentpassword>old-fake</currentpassword>' +
+        '<newpassword>new-fake</newpassword><WifiSsid>Fake-Net</WifiSsid><WifiWpapsk>k1</WifiWpapsk>' +
+        '<MixWifiWpapsk>k2</MixWifiWpapsk><WifiWepKey1>k3</WifiWepKey1><WifiRadiusKey>k4</WifiRadiusKey>' +
+        '<nonce>n1</nonce><pwd>p1</pwd><hash>h1</hash><WifiEnable>1</WifiEnable></request>',
+    );
+    expect(out).not.toMatch(/old-fake|new-fake|Fake-Net|>k[1-4]<|>n1<|>p1<|>h1</);
+    expect(out).toContain('<username>admin</username>');
+    expect(out).toContain('<WifiEnable>1</WifiEnable>');
   });
 });

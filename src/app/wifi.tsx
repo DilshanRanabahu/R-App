@@ -150,6 +150,16 @@ export default function WifiScreen() {
     );
   };
 
+  // Logged out (also the idle / background timeout): forget every secret right away,
+  // not only when the screen closes.
+  if (status !== 'logged_in' && (password !== null || newPassword !== '' || confirm !== '')) {
+    setPassword(null);
+    setShowPassword(false);
+    setShowQr(false);
+    setNewPassword('');
+    setConfirm('');
+  }
+
   if (status !== 'logged_in') {
     return (
       <SubScreen title="Wi-Fi" fallback="/router">

@@ -20,6 +20,9 @@ jest.mock('../crypto', () => ({
   decryptSecretReply: jest.fn(),
 }));
 
+const mockTrustedKey = jest.fn();
+jest.mock('@/security/routerIdentity', () => ({ trustedPublicKey: () => mockTrustedKey() }));
+
 // Same shape as this router's multi-basic-settings (values made up).
 const MAIN: WifiSsidRaw = {
   WifiWepKey4: '',
@@ -50,9 +53,9 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockGet.mockImplementation(async (path: string) => {
     if (path === '/api/wlan/multi-basic-settings') return { Ssids: { Ssid: [MAIN, GUEST] } };
-    if (path === '/api/user/state-login') return { rsapadingtype: '1' };
-    return { encpubkeyn: 'abc', encpubkeye: '010001' };
+    return { rsapadingtype: '1' }; // state-login
   });
+  mockTrustedKey.mockResolvedValue({ n: 'abc', e: '010001' });
   mockPost.mockResolvedValue('OK');
 });
 
@@ -122,6 +125,12 @@ describe('saveWifiNetwork', () => {
     const [, body, options] = mockPost.mock.calls[0] as [string, never, PostOptions];
     expect(mockEncrypt).not.toHaveBeenCalled();
     expect(buildRequest(body, options.escape)).not.toContain('Wpapsk');
+  });
+
+  it('sends nothing when the key does not belong to the pinned router', async () => {
+    mockTrustedKey.mockRejectedValue(new Error('identity_mismatch'));
+    await expect(saveWifiNetwork({ ssid: 'X', hidden: false, newPassword: 'abcdefgh' })).rejects.toThrow();
+    expect(mockPost).not.toHaveBeenCalled();
   });
 
   it('refuses a password change for non-WPA2 networks', async () => {

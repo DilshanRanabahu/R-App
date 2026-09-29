@@ -16,14 +16,14 @@ jest.mock('../crypto', () => ({
   rsaEncryptHex: (xml: string, key: unknown, padding: string) => mockEncrypt(xml, key, padding),
   loginPasswordHash: jest.fn(),
 }));
+// The pinned-key check itself is tested in routerIdentity.test.
+const mockTrustedKey = jest.fn();
+jest.mock('@/security/routerIdentity', () => ({ trustedPublicKey: () => mockTrustedKey() }));
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockGet.mockImplementation(async (path: string) =>
-    path === '/api/user/state-login'
-      ? { password_type: '4', rsapadingtype: '1', State: '0' }
-      : { encpubkeyn: 'abc123', encpubkeye: '010001' },
-  );
+  mockGet.mockImplementation(async () => ({ password_type: '4', rsapadingtype: '1', State: '0' }));
+  mockTrustedKey.mockResolvedValue({ n: 'abc123', e: '010001' });
   mockPost.mockResolvedValue('OK');
 });
 
@@ -49,18 +49,17 @@ describe('changeAdminPassword', () => {
   });
 
   it('uses PKCS#1 when the router asks for it', async () => {
-    mockGet.mockImplementation(async (path: string) =>
-      path === '/api/user/state-login' ? { rsapadingtype: '0' } : { encpubkeyn: 'ab', encpubkeye: '03' },
-    );
+    mockGet.mockImplementation(async () => ({ rsapadingtype: '0' }));
+    mockTrustedKey.mockResolvedValue({ n: 'ab', e: '03' });
     await changeAdminPassword('a', 'b');
     const options = mockPost.mock.calls[0]?.[2] as PostOptions;
     await options.encrypt?.('x');
     expect(mockEncrypt).toHaveBeenCalledWith('x', { n: 'ab', e: '03' }, 'pkcs1');
   });
 
-  it('refuses to send without the router public key', async () => {
-    mockGet.mockImplementation(async (path: string) => (path === '/api/user/state-login' ? {} : {}));
-    await expect(changeAdminPassword('a', 'b')).rejects.toThrow();
+  it('sends nothing when the key does not belong to the pinned router', async () => {
+    mockTrustedKey.mockRejectedValue(new Error('identity_mismatch'));
+    await expect(changeAdminPassword('a', 'b')).rejects.toThrow('identity_mismatch');
     expect(mockPost).not.toHaveBeenCalled();
   });
 });
