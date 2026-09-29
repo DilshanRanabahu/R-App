@@ -78,16 +78,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       limiter.record();
       await secureLogin(username, password, options.acceptNewIdentity);
       limiter.reset();
+      // Save before flipping to logged_in: the biometric prompt pauses the activity,
+      // and re-rendering every screen underneath it crashed Fabric in release builds.
+      let remembered = false;
+      if (options.remember) {
+        try {
+          await rememberPassword(username, password);
+          remembered = true;
+        } catch {
+          // No biometrics / screen lock: stay logged in, just don't store it.
+        }
+      }
       lastActivity.current = Date.now();
       setStatus('logged_in');
-      if (!options.remember) return { remembered: false };
-      try {
-        await rememberPassword(username, password);
-        return { remembered: true };
-      } catch {
-        // No biometrics / screen lock: stay logged in, just don't store it.
-        return { remembered: false };
-      }
+      return { remembered };
     },
     [limiter],
   );

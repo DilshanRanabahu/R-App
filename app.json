@@ -2,7 +2,7 @@
   "expo": {
     "name": "R App",
     "slug": "r-app",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "rapp",
@@ -38,7 +38,8 @@
         "android.permission.READ_SMS",
         "android.permission.USE_FINGERPRINT"
       ],
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "versionCode": 2
     },
     "plugins": [
       "expo-router",

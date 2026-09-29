@@ -14,8 +14,18 @@ interface CardProps {
 }
 
 export function Card({ title, right, onPress, accessibilityLabel, style, children }: CardProps) {
-  const content = (
-    <>
+  // Always a Pressable, even when not tappable: swapping View <-> Pressable when
+  // onPress toggles (e.g. on login) remounts the subtree and crashed Fabric.
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
+      accessible={!!onPress}
+      android_ripple={onPress ? { color: colors.surfaceMuted } : undefined}
+      accessibilityRole={onPress ? 'button' : undefined}
+      accessibilityLabel={onPress ? accessibilityLabel : undefined}
+      style={[styles.card, style]}
+    >
       {(title || right) && (
         <View style={styles.header}>
           {title ? <AppText variant="heading">{title}</AppText> : <View />}
@@ -23,23 +33,8 @@ export function Card({ title, right, onPress, accessibilityLabel, style, childre
         </View>
       )}
       {children}
-    </>
+    </Pressable>
   );
-
-  if (onPress) {
-    return (
-      <Pressable
-        onPress={onPress}
-        android_ripple={{ color: colors.surfaceMuted }}
-        accessibilityRole="button"
-        accessibilityLabel={accessibilityLabel}
-        style={[styles.card, style]}
-      >
-        {content}
-      </Pressable>
-    );
-  }
-  return <View style={[styles.card, style]}>{content}</View>;
 }
 
 const styles = StyleSheet.create({
