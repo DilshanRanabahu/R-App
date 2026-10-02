@@ -60,7 +60,23 @@ def main() -> None:
     render(BACKGROUND, PRIMARY, BACKGROUND, 1.35).save(ASSETS / "icon.png")
     render(clear, PRIMARY, BACKGROUND, 1.2).save(ASSETS / "splash-icon.png")
     render(BACKGROUND, PRIMARY, BACKGROUND, 1.35).resize((48, 48), Image.LANCZOS).save(ASSETS / "favicon.png")
-    print("icons written to", ASSETS)
+    readme_icon()
+    print("icons written to", ASSETS, "and", DOCS_IMAGES)
+
+
+DOCS_IMAGES = ASSETS.parent / "docs" / "images"
+
+
+def readme_icon() -> None:
+    """Rounded-corner copy of the app icon for README.md (GitHub shows PNGs square)."""
+    big = SIZE * SCALE
+    img = Image.new("RGBA", (big, big), (0, 0, 0, 0))
+    full = render(BACKGROUND, PRIMARY, BACKGROUND, 1.35).resize((big, big), Image.LANCZOS)
+    mask = Image.new("L", (big, big), 0)
+    ImageDraw.Draw(mask).rounded_rectangle([0, 0, big - 1, big - 1], radius=int(big * 0.22), fill=255)
+    img.paste(full, (0, 0), mask)
+    DOCS_IMAGES.mkdir(parents=True, exist_ok=True)
+    img.resize((256, 256), Image.LANCZOS).save(DOCS_IMAGES / "app-icon.png", optimize=True)
 
 
 if __name__ == "__main__":
