@@ -128,7 +128,7 @@ Bottom tab bar (height 64, white, top border), **5 tabs**:
 | Home | `home` | Connection, speed + chart, data used (owner's choice: no signal / device / mobile-data cards) |
 | Signal | `cellular` | Signal details, antenna mode |
 | Devices | `phone-portrait` | Connected devices |
-| Router | `hardware-chip` | Everything that changes the router: status, mobile data, reboot; next Wi-Fi, admin password, data plan, auto reboot, blocked devices |
+| Router | `hardware-chip` | Everything that changes the router: status, Wi-Fi, mobile data, admin password, reboot; next data plan, auto reboot, blocked devices |
 | Settings | `settings` | The app only: account (log in/out), router address, version; later app lock |
 
 - The **Messages** tab (SMS + USSD) was dropped on 2026-09-29 (owner's choice) and replaced by **Router**.
@@ -169,7 +169,7 @@ Wireframes are at 384 dp width.
 └──────────────────────────────────────┘
 ```
 
-- The wireframe above was the original plan. The owner chose a simpler Home: **no Log in button, no signal card, no quick actions**. Signal and Devices have their own tabs; the mobile data switch lives in Settings → Data. Home works fully without login.
+- The wireframe above was the original plan. The owner chose a simpler Home: **no Log in button, no signal card, no quick actions**. Signal and Devices have their own tabs; the mobile data switch lives in the Router tab (§9.4). Home works fully without login.
 - Pull to refresh.
 - **Phase 1 as built:** status chip (Online / Offline / Checking), subtitle "HUTCH · 4G" (adds "SIM not ready" if needed), speed card with a **live chart of the last 60 s** (download blue line + soft fill, upload purple line, dot on the newest point; legend "● Download ● Upload"; speed axis on the left with the unit once on top ("Mbps"/"kbps") and values 0 / half / max on rounded 1-2-5 steps; time axis "60 s ago · 30 s ago · Now"; built from the 3 s traffic polling, memory only), **"Data used" card shows this session with a ↓ / ↑ split (blue / purple arrows, like the chart) + connection time + lifetime total**, then a **"Monthly usage" card**: "Today" and "This month" side by side, a note top-right ("Resets on the 1st", or "Since 26 Sep" when the router's counters were cleared after the month began), and either the plan progress bar with "93 % of your 60 GB plan · almost used up" (colour + words per §7) or "No monthly data plan is set on the router." Under the chart: **Top / Average** for the last minute in two columns aligned with Download / Upload. Nothing else: no Log in button, signal card or quick actions (log in from Settings, Signal or Devices).
 
@@ -295,7 +295,7 @@ Every screen and card handles these; design them, don't leave blank screens.
 | Account locked | Countdown in login screen |
 | Action in progress | Button shows small spinner + "Rebooting…", disabled |
 | Error | Snackbar with short message + Retry; technical code only in a "Details" line |
-| Empty | Empty state component ("No messages", "No devices connected") |
+| Empty | Empty state component ("No devices connected") |
 | Stale data | If last update > 30 s: small `textMuted` "Updated 45 s ago" under the header (not built yet) |
 | Session ended | Snackbar "Your session ended. Please log in again." and cards return to their login-required state |
 
@@ -333,7 +333,7 @@ After reboot: full-screen waiting screen ("Rebooting your router…", spinner). 
 ## 14. Writing style
 
 - Plain English, short: "Mobile data is off", not "Dial-up connection disabled".
-- Explain technical terms once in help sheets (RSRP, SINR, USSD).
+- Explain technical terms once in help sheets (RSRP, SINR, RSRQ).
 - Units always shown: `Mbps`, `GB`, `dBm`, `dB`.
 - Speeds in **Mbps** (bits); below 1 Mbps show **kbps** so small values stay readable. Data amounts in **MB/GB** (bytes, 1 GB = 1024 MB to match the router UI); values ≥ 100 show no decimals ("177 MB"), smaller ones one decimal ("1.5 KB").
 - Plural-aware counts: "1 device", "2 devices".
@@ -366,12 +366,12 @@ After reboot: full-screen waiting screen ("Rebooting your router…", spinner). 
 | Screen / part | Status |
 |---|---|
 | Theme tokens, components | ✅ Built |
-| Home (9.1) | ✅ Built incl. speed chart; monthly data card in Phase 2 |
+| Home (9.1) | ✅ Built incl. speed chart and monthly usage card |
 | Signal (9.2) | ✅ Built; antenna mode in Phase 2 |
 | Devices (9.3) | ✅ Built (Wi-Fi + cable); detail screen in Phase 2 |
-| Router (9.4) | ✅ Status card, mobile data, reboot; more groups in Phase 2 |
+| Router (9.4) | ✅ Status card, mobile data, reboot · 🔨 Wi-Fi screen, change admin password (built, not yet run on the router); more groups in Phase 2 |
 | Settings (9.5) | ✅ App only (account, router address, version) |
 | Login (9.6) | ✅ Built, screenshot-blocked |
 | States (10) | ✅ Built except "stale data" line |
-| Dangerous actions (11) | 🔨 Reboot + mobile data off built; others in Phase 2 |
+| Dangerous actions (11) | 🔨 Reboot, mobile data off, Wi-Fi change, admin password change built; block device and factory reset later |
 | App icon (16) | ✅ Generated; visible after standalone build |

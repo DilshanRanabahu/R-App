@@ -18,12 +18,13 @@ If these documents conflict, **security rules in this file win**, then FEATURES.
 
 `CLAUDE.md` only contains `@AGENTS.md`, so Claude Code loads this file automatically.
 
-### Current status (2026-09-29)
+### Current status (2026-10-02)
 
 - **Phase 1 is built** and runs on the phone through Expo Go. The user has logged in successfully with the real router; dashboard, signal and devices (Wi-Fi + cable) are verified on the phone.
-- **Not yet exercised on the phone:** logout, remember password, session expiry, mobile data switching, reboot, "Trust new router".
+- **Phase 2 so far:** Router tab (status card, mobile data, reboot), monthly usage on Home, speed chart are done. **Built but not yet run on the router:** change admin password, Wi-Fi name/password/hide, reveal Wi-Fi password, Wi-Fi QR code.
+- **Not yet exercised on the phone:** logout, remember password, session expiry, mobile data switching, reboot, "Trust new router", and the Phase 2 items above.
 - **No standalone APK yet.** The app icon is generated in `assets/`. The build route (EAS cloud vs local Android SDK) is **the user's decision**; don't start either without asking (§9).
-- **Next:** Phase 2, Router tab first (see FEATURES.md → Build phases). The Messages tab was replaced by a Router tab; SMS/USSD are dropped.
+- **Next:** rest of Phase 2 (data plan, automatic reboot, device detail + MAC block, network mode; see FEATURES.md → Build phases). The Messages tab was replaced by a Router tab; SMS/USSD are dropped.
 - Full per-feature status is in FEATURES.md; per-screen status in DESIGN.md §17.
 
 ## 2. Environment
@@ -96,21 +97,23 @@ src/
     _layout.tsx               # providers (query, snackbar, auth), stack
     login.tsx                 # modal, screenshot-blocked
     rebooting.tsx             # waits for router after reboot
+    wifi.tsx                  # Wi-Fi name/password/QR, screenshot-blocked
+    change-password.tsx       # admin password change, screenshot-blocked
     (tabs)/_layout.tsx        # 5 tabs (DESIGN.md §8) + "can't reach router" gate
     (tabs)/index.tsx          # Home
     (tabs)/signal.tsx
     (tabs)/devices.tsx
-    (tabs)/router.tsx         # router management (status, mobile data, reboot, ...)
+    (tabs)/router.tsx         # router management (status, Wi-Fi, mobile data, security, reboot)
     (tabs)/settings.tsx       # the app only (account, router address, version)
-    antenna.tsx, device/[mac].tsx, settings/*.tsx   # sub-screens (Phase 2)
+    # planned: antenna.tsx, device/[mac].tsx
   api/
-    client.ts                 # session cookie, token rotation, request queue, timeout
-    auth.ts                   # state-login, login, logout
-    crypto.ts                 # SHA-256, base64, login hash (RSA in Phase 2)
-    xml.ts                    # safe build/parse + escaping
-    validate.ts               # input validators (SSID, Wi-Fi key, phone, USSD, IP, MAC)
+    client.ts                 # session cookie, token rotation, request queue, timeout, RSA bodies
+    auth.ts                   # state-login, login, logout, admin password change
+    crypto.ts                 # SHA-256, base64, login hash, RSA (web UI scheme), Wi-Fi reveal decrypt
+    xml.ts                    # safe build/parse + escaping (XML, web UI, Wi-Fi UI variants)
+    validate.ts               # input validators (IP, SSID, Wi-Fi key, MAC, admin password; phone/USSD/SMS kept unused)
     errors.ts                 # HiLink codes → typed errors + user messages
-    endpoints/                # monitoring, device, net, dialup, wlan (+ lan hosts)
+    endpoints/                # monitoring, device, net, dialup, wlan (hosts), wifi (settings), parse (helpers)
     types.ts
     __tests__/  __fixtures__/ # tests; sanitized sample XML only
   security/
@@ -210,6 +213,8 @@ Layer rule: `src/app/` → `hooks/` + `state/` → `api/` + `security/`. Screens
   - Phone number: `^\+?[0-9]{3,15}$`.
   - USSD: `^[*#0-9]{2,30}$`, must start with `*` or `#`.
   - SMS text: ≤ 459 chars (3 parts), trimmed.
+  - (Phone / USSD / SMS validators exist but are unused since SMS/USSD were dropped; they and the SMS link rule below apply if those features return.)
+  - Admin password: 8–32 chars, ASCII 32–126, no leading space, different from the current one.
   - Router address: see §8.5.
   - MAC: `^([0-9A-F]{2}:){5}[0-9A-F]{2}$` (normalize upper case).
 - Treat **all router data as untrusted** (SMS bodies, device names, SSIDs, USSD replies). Render as plain `<Text>` only. No `WebView`, no `dangerouslySetInnerHTML`, no `eval`/`new Function`.
@@ -296,7 +301,7 @@ This app controls a **real, in-use router**. The laptop and phone depend on it f
 1. **Phase 1 (MVP): built.** Project setup, theme tokens, security modules (§8.2–8.6), router detection, no-login dashboard, login/session, signal, devices (Wi-Fi + cable), mobile data toggle, reboot, app icon. Remaining: phone tests of logout, mobile data switch, reboot, remember password (each needs the user's go-ahead, §9).
 2. **Release (pending user decision):** standalone APK with the icon via EAS Build or a local Android SDK build. Release signing: keystore **outside the repo**, wired with a config plugin (never hand-edit `android/`).
 3. **Phase 2 (Router tab first):** ~~change admin password, Wi-Fi settings (RSA) + Wi-Fi QR~~ (built, not yet run on the router), data plan, automatic reboot, device detail + MAC block, network mode; then antenna positioning mode, app lock, feature-flag hiding. Done: speed chart, monthly usage, Router tab. **SMS/USSD dropped** (owner's choice, 2026-09-29).
-4. **Phase 3:** network mode, band lock, APN, notifications, widget, languages, factory reset.
+4. **Phase 3:** band lock, APN, notifications, widget, languages, factory reset.
 
 Security modules are built **first**, not added later.
 

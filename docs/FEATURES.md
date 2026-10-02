@@ -21,7 +21,7 @@ A React Native (Expo) app for managing a Huawei B312-926 (HUAWEI 4G Router 2s) f
 | Area | Status |
 |---|---|
 | Verified on the phone | Router detection, login, no-login dashboard, logged-in dashboard, signal details, connected devices (Wi-Fi + cable), "this phone" label, feature flags, pull-to-refresh, "can't reach router" screen, screenshot blocking on login |
-| Built, not yet exercised | Logout, remember password, session expiry / idle logout, mobile data **switching**, reboot + waiting screen, "Trust new router" flow |
+| Built, not yet exercised | Logout, remember password, session expiry / idle logout, mobile data **switching**, reboot + waiting screen, "Trust new router" flow; Phase 2: change admin password, Wi-Fi name/password/hide, show Wi-Fi password, Wi-Fi QR |
 | Security built | Router fingerprint pinning, encrypted password storage (opt-in), login attempt limiter, idle/background logout, screenshot blocking, device re-auth for risky actions, cleartext only to the router, log redaction |
 | App icon | Designed and generated (`assets/`); visible only after a standalone build |
 | Tests | 133 unit tests passing; type check + lint clean |
@@ -156,8 +156,8 @@ Removed on 2026-09-29 (owner's choice): the owner doesn't need SMS or USSD in th
 | 12.1 | Router fingerprint pinning (pre-login: model + public key; post-login: serial + MAC) with "This doesn't look like your router" warning | P1 | 🔨 (first-login pin saved; mismatch flow not exercised) |
 | 12.2 | Login attempt limiter (3 per 5 min) + router lock countdown | P1 | 🔨 |
 | 12.3 | Idle logout (10 min) and background logout (5 min) | P1 | 🔨 |
-| 12.4 | Screenshot / recents blocking on sensitive screens | P1 | ✅ login screen |
-| 12.5 | Device re-auth (fingerprint/PIN) for risky actions; blocked if the phone has no screen lock | P1 | 🔨 reboot, "Trust new router" |
+| 12.4 | Screenshot / recents blocking on sensitive screens | P1 | ✅ login screen · 🔨 Wi-Fi, change admin password |
+| 12.5 | Device re-auth (fingerprint/PIN) for risky actions; blocked if the phone has no screen lock | P1 | 🔨 reboot, "Trust new router", Wi-Fi change, show Wi-Fi password / QR, admin password change |
 | 12.6 | Cleartext HTTP allowed only to the router in release builds (config plugin) | P1 | 🔨 (applies to standalone builds) |
 | 12.7 | Log redaction + `console` stripped from release builds | P1 | ✅ |
 | 12.8 | App lock on open (optional, fingerprint/PIN) | P2 | ⬜ |
@@ -189,8 +189,8 @@ Change password → 1.9 (screenshot-blocked)                                    
 1. **Phase 1 (MVP)**: ✅ project setup, router detection, no-login dashboard, login + token handling, signal, devices (Wi-Fi + cable), data toggle, reboot, security modules, app icon.
    - Remaining: test on the phone the logout, mobile data switch, reboot and remember-password flows.
 2. **Release (pending decision)**: standalone APK with the icon. Choose EAS cloud build (needs a free Expo account) or a local build (needs the Android SDK, ~4–5 GB). See [Release](#release).
-3. **Phase 2 (Router tab first)**: change admin password, Wi-Fi settings (RSA) + Wi-Fi QR, data plan, automatic reboot (`autoreboot_enable=1` on this router), device details + MAC block, network mode; then antenna positioning mode, app lock. Already done: speed chart, monthly usage, Router tab. SMS/USSD dropped.
-4. **Phase 3**: network mode, band lock, APN, notifications, widget, languages, factory reset.
+3. **Phase 2 (Router tab first)**: data plan, automatic reboot (`autoreboot_enable=1` on this router), device details + MAC block, network mode; then antenna positioning mode, app lock. Done: speed chart, monthly usage, Router tab. Built, not yet run on the router: change admin password, Wi-Fi settings (RSA) + Wi-Fi QR. SMS/USSD dropped.
+4. **Phase 3**: band lock, APN, notifications, widget, languages, factory reset.
 
 ## Release
 
@@ -207,7 +207,7 @@ Change password → 1.9 (screenshot-blocked)                                    
 | HTTP | `fetch` via `src/api/client.ts` (manages `SessionID` cookie + `__RequestVerificationToken`, `credentials: 'omit'`) |
 | XML | `fast-xml-parser` (DOCTYPE/ENTITY rejected) |
 | Hashing | `expo-crypto` (SHA-256) |
-| RSA | `node-forge` (installed; used in Phase 2 for Wi-Fi password) |
+| RSA | `node-forge` (admin password change, Wi-Fi password change and reveal) |
 | Secure storage | `expo-secure-store` |
 | Re-auth | `expo-local-authentication` |
 | Screenshot blocking | `expo-screen-capture` |
@@ -231,5 +231,5 @@ Change password → 1.9 (screenshot-blocked)                                    
 - **Router public key** is stable between requests; **not verified across reboots/firmware updates**. If it changes, the app shows the "not your router" warning and the user must re-trust.
 - **Dangerous actions** (reboot, factory reset, Wi-Fi off, data off, MAC block of own phone) need confirmation dialogs; most also need fingerprint/PIN.
 - **Security:** never hardcode the admin password; **change the current admin password** because it was shared in plain text. Keep the app LAN-only; use a VPN (e.g. Tailscale/WireGuard) for remote access instead of port forwarding.
-- `npm audit`: 13 moderate issues, all in Expo build tooling (not shipped in the app). Recheck before release.
+- `npm audit`: 13 moderate issues. 12 are in Expo build tooling (not shipped); one ships in the app (`expo-router` → `query-string` → `decode-uri-component`, low risk, see AGENTS.md §12a). Recheck before release.
 - Endpoints marked ⏳ are standard HiLink endpoints but may differ or be missing on this firmware. Check each one before building its screen.
