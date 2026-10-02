@@ -59,6 +59,8 @@ export default function ChangePasswordScreen() {
     if (auth === 'no_lock') return setErrors({ form: NO_LOCK_MESSAGE });
     if (auth !== 'ok') return;
 
+    // Once the screen starts leaving, don't touch its state: re-rendering the form
+    // during the exit transition crashed Fabric in release builds (see login.tsx).
     setBusy(true);
     try {
       await changePassword(current, next);
@@ -74,11 +76,11 @@ export default function ChangePasswordScreen() {
       } else if (isRouterError(e, 'wrong_password') || isRouterError(e, 'router')) {
         // The web UI shows "Password incorrect" for every other refusal.
         setErrors({ current: 'Current password is incorrect.' });
+        setBusy(false);
       } else {
         setErrors({ form: userMessage(e) });
+        setBusy(false);
       }
-    } finally {
-      setBusy(false);
     }
   };
 

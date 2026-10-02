@@ -78,12 +78,14 @@ export default function LoginScreen() {
     setError(null);
     try {
       const { remembered } = await auth.login(username.trim(), password, { remember, acceptNewIdentity });
-      setPassword('');
       if (remember && !remembered) snackbar.show("Logged in. Couldn't save the password on this phone.");
+      // No state changes after this: re-rendering the form (busy → editable flips the
+      // inputs' and button's opacity) while the modal's exit transition runs made Fabric
+      // re-parent views that react-native-screens still held, and release builds crashed
+      // with "addViewAt: … already has a parent". The password state goes with the screen.
       close();
     } catch (e) {
       handleError(e, { kind: 'typed' });
-    } finally {
       setBusy(false);
     }
   };
@@ -92,13 +94,13 @@ export default function LoginScreen() {
     setBusy(true);
     setError(null);
     try {
-      if (await auth.loginWithSaved(username.trim(), acceptNewIdentity)) close();
+      // Same as submit(): leave without touching state on success.
+      if (await auth.loginWithSaved(username.trim(), acceptNewIdentity)) return close();
     } catch (e) {
       if (isRouterError(e, 'wrong_password')) setHasSaved(false);
       handleError(e, { kind: 'saved' });
-    } finally {
-      setBusy(false);
     }
+    setBusy(false);
   };
 
   // "Trust new router" needs device re-auth (AGENTS.md §8.8).
