@@ -1,6 +1,8 @@
+import { router, type Href } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { AppText } from '@/components/AppText';
+import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { ProgressBar } from '@/components/ProgressBar';
 import { Screen } from '@/components/Screen';
@@ -114,6 +116,13 @@ export default function SignalScreen() {
           </AppText>
         </Card>
       ) : null}
+
+      <Button
+        label="Find best router position"
+        variant="secondary"
+        icon="locate-outline"
+        onPress={() => router.push('/antenna' as Href)}
+      />
 
       <Card title="What do these numbers mean?">
         <AppText variant="caption" color={colors.textSecondary}>

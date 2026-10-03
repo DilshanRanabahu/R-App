@@ -33,14 +33,16 @@ It is built and tested for the **Huawei B312-926** (HUAWEI 4G Router 2s). Other 
 | | Feature | Login needed |
 |---|---|---|
 | 🏠 | **Home**: online status, operator and network type, live download/upload speed with a 60-second chart, session and lifetime data, today's and this month's usage with plan progress | No |
-| 📶 | **Signal**: RSRP, SINR, RSRQ, RSSI with a plain-English rating (Excellent → Poor), band, PCI and cell ID | Yes |
+| 📶 | **Signal**: RSRP, SINR, RSRQ, RSSI with a plain-English rating (Excellent → Poor), band, PCI and cell ID, and an antenna mode that helps you find the best spot for the router | Yes |
 | 📱 | **Devices**: everything connected over Wi-Fi *and* cable, new devices flagged, your own names and icons, device maker, devices seen earlier, and blocking a device from the Wi-Fi | Yes |
-| 🛜 | **Wi-Fi**: change name and password, hide the network, show the password, share a QR code for guests | Yes |
+| 🛜 | **Wi-Fi**: change name and password, hide the network, show the password, share a QR code for guests, and a separate guest network that turns itself off | Yes |
 | 🌐 | **Mobile data**: turn the SIM's internet on or off | Yes |
 | 🔐 | **Admin password**: change the router's login password | Yes |
-| 🔄 | **Reboot**: with a waiting screen that tells you when the router is back | Yes |
+| 📡 | **4G band**: let the router choose, or lock one band for a steadier connection | Yes |
+| 🔄 | **Reboot**: now, with a waiting screen, or automatically on the router's schedule | Yes |
+| 🔒 | **App lock**: fingerprint or PIN when the app opens | No |
 
-Coming next: data plan settings, automatic reboot, network mode (4G/3G), and an antenna positioning mode that beeps as the signal improves. See [docs/FEATURES.md](docs/FEATURES.md) for the full list and status.
+Coming next: data plan settings. See [docs/FEATURES.md](docs/FEATURES.md) for the full list and status.
 
 ## Security
 

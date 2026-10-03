@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, Switch, View } from 'react-native';
 
@@ -13,11 +13,15 @@ import { LoginRequired, Skeleton } from '@/components/States';
 import { StatusChip } from '@/components/StatusChip';
 import {
   useConnectionChip,
+  useGuestNetwork,
   useMobileData,
   useReboot,
+  useRebootSchedule,
   useRouterDetails,
   useRouterInfo,
   useSetMobileData,
+  useSetRebootSchedule,
+  useSignal,
 } from '@/hooks/router';
 import { useManualRefresh } from '@/hooks/useManualRefresh';
 import { useScreenFocus } from '@/hooks/useScreenFocus';
@@ -26,7 +30,7 @@ import { useAuth } from '@/state/AuthProvider';
 import { markRebootRequested } from '@/state/rebootGate';
 import { useSnackbar } from '@/state/SnackbarProvider';
 import { colors, space } from '@/theme';
-import { formatDuration } from '@/utils/format';
+import { formatClock, formatDuration } from '@/utils/format';
 
 /** Router tab: everything that changes the router. App options stay in Settings. */
 export default function RouterScreen() {
@@ -41,6 +45,10 @@ export default function RouterScreen() {
   const mobileData = useMobileData();
   const setMobileData = useSetMobileData();
   const reboot = useReboot();
+  const guest = useGuestNetwork(focused && loggedIn);
+  const schedule = useRebootSchedule(focused && loggedIn);
+  const setSchedule = useSetRebootSchedule();
+  const signal = useSignal(focused && loggedIn);
   const [confirmDataOff, setConfirmDataOff] = useState(false);
   const [confirmReboot, setConfirmReboot] = useState(false);
 
@@ -66,10 +74,11 @@ export default function RouterScreen() {
 
   const { refreshing, onRefresh } = useManualRefresh(() => [
     info.refetch(),
-    ...(loggedIn ? [details.refetch(), mobileData.refetch()] : []),
+    ...(loggedIn ? [details.refetch(), mobileData.refetch(), guest.refetch(), schedule.refetch()] : []),
   ]);
 
   const d = details.data;
+  const s = schedule.data;
   const facts = [
     d?.uptimeSeconds != null ? `Running for ${formatDuration(d.uptimeSeconds)}` : null,
     d?.firmware ? `Firmware ${d.firmware}` : null,
@@ -118,6 +127,15 @@ export default function RouterScreen() {
               subtitle="Show password, QR code for guests, change"
               onPress={() => router.push('/wifi')}
             />
+            <ListRow
+              icon="people-outline"
+              title="Guest Wi-Fi"
+              subtitle="A separate network for visitors"
+              value={guest.data ? (guest.data.enabled ? 'On' : 'Off') : undefined}
+              chevron
+              onPress={() => router.push('/guest-wifi' as Href)}
+              divider
+            />
           </ListGroup>
 
           <ListGroup title="Internet">
@@ -142,6 +160,15 @@ export default function RouterScreen() {
                 />
               }
             />
+            <ListRow
+              icon="radio-outline"
+              title="4G band"
+              subtitle="Automatic, or lock one band for a steadier connection"
+              value={signal.data?.band ? `Band ${signal.data.band}` : undefined}
+              chevron
+              onPress={() => router.push('/lte-band' as Href)}
+              divider
+            />
           </ListGroup>
 
           <ListGroup title="Security">
@@ -149,6 +176,38 @@ export default function RouterScreen() {
               icon="key-outline"
               title="Change admin password"
               onPress={() => router.push('/change-password')}
+            />
+          </ListGroup>
+
+          <ListGroup title="Maintenance">
+            <ListRow
+              icon="calendar-outline"
+              title="Automatic restart"
+              subtitle={
+                setSchedule.isPending
+                  ? 'Updating…'
+                  : s
+                    ? `${s.everyDays === 1 ? 'Every day' : `Every ${s.everyDays} days`}, between ${formatClock(s.fromMinute)} and ${formatClock(s.toMinute)}`
+                    : schedule.isError
+                      ? 'Not available on this router'
+                      : undefined
+              }
+              right={
+                <Switch
+                  value={s?.enabled ?? false}
+                  disabled={!s || setSchedule.isPending}
+                  onValueChange={(on) =>
+                    setSchedule.mutate(on, {
+                      onSuccess: () =>
+                        snackbar.show(on ? 'Automatic restart is on.' : 'Automatic restart is off.'),
+                      onError: (e) => snackbar.show(userMessage(e)),
+                    })
+                  }
+                  trackColor={{ true: colors.primary, false: colors.border }}
+                  thumbColor={colors.surface}
+                  accessibilityLabel="Automatic restart"
+                />
+              }
             />
           </ListGroup>
 

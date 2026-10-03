@@ -3,9 +3,11 @@ import type {
   BasicInformationRaw,
   DeviceInformationRaw,
   PublicKeyRaw,
+  RebootSchedule,
   RouterDetails,
   Signal,
   SignalRaw,
+  TimeRebootRaw,
 } from '../types';
 import { decodeCharRefs, toNumber, toSignalValue } from './parse';
 
@@ -46,6 +48,35 @@ export async function getSignal(): Promise<Signal> {
     cellId: r.cell_id ?? '',
     band: r.band ?? '',
   };
+}
+
+/** Needs login. The router's own "restart every N days in a quiet window" (diagnosis/time_reboot). */
+export async function getRebootSchedule(): Promise<RebootSchedule> {
+  const r = await routerClient.get<TimeRebootRaw>('/api/diagnosis/time_reboot');
+  return {
+    enabled: r.enable === '1',
+    everyDays: toNumber(r.dayinterval),
+    fromMinute: toNumber(r.begintime),
+    toMinute: toNumber(r.endtime),
+  };
+}
+
+/**
+ * Needs login. Switch the scheduled restart on or off. Like the web page
+ * (systemsettings.js changeTimeRebootSwitch): send the settings back with `enable` flipped.
+ */
+export async function setRebootScheduleEnabled(enabled: boolean): Promise<void> {
+  const r = await routerClient.get<TimeRebootRaw>('/api/diagnosis/time_reboot');
+  await routerClient.post(
+    '/api/diagnosis/time_reboot',
+    {
+      enable: enabled ? 1 : 0,
+      dayinterval: r.dayinterval ?? '',
+      begintime: r.begintime ?? '',
+      endtime: r.endtime ?? '',
+    },
+    { retryBadToken: false },
+  );
 }
 
 /** Dangerous: callers must confirm + re-auth first (AGENTS.md §8.8). */

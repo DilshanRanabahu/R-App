@@ -21,11 +21,11 @@ If these documents conflict, **security rules in this file win**, then FEATURES.
 ### Current status (2026-10-02)
 
 - **Phase 1 is built** and runs on the phone through Expo Go. The user has logged in successfully with the real router; dashboard, signal and devices (Wi-Fi + cable) are verified on the phone.
-- **Phase 2 so far:** Router tab (status card, mobile data, reboot), monthly usage on Home, speed chart are done. **Built but not yet run on the router:** change admin password, Wi-Fi name/password/hide, reveal Wi-Fi password, Wi-Fi QR code. **Built, not yet checked on the phone:** Devices tab groups (new / connected / not connected), device detail (name, type, maker).
+- **Phase 2 so far:** Router tab (status card, mobile data, reboot), monthly usage on Home, speed chart are done. **Built but not yet run on the router:** change admin password, Wi-Fi name/password/hide, reveal Wi-Fi password, Wi-Fi QR code. **Built, not yet checked on the phone:** Devices tab groups (new / connected / not connected), device detail (name, type, maker), antenna mode, app lock. **Built, POST not yet run on the router:** guest Wi-Fi, automatic restart switch, LTE band lock.
 - **Device blocking (FEATURES 8.4) is built, its POST not yet run on the router.** The format was read from the router's `devicemanagement.js` on 2026-10-03 (see §6). Running it for real needs the user's approval (§9).
 - **Not yet exercised on the phone:** logout, remember password, session expiry, mobile data switching, reboot, "Trust new router", and the Phase 2 items above.
 - **No standalone APK yet.** The app icon is generated in `assets/`. The build route (EAS cloud vs local Android SDK) is **the user's decision**; don't start either without asking (§9).
-- **Next:** rest of Phase 2 (data plan, automatic reboot, device detail + MAC block, network mode; see FEATURES.md → Build phases). The Messages tab was replaced by a Router tab; SMS/USSD are dropped.
+- **Next:** test the built features on the router and phone (each router change needs the user's go-ahead, §9). The Messages tab was replaced by a Router tab; SMS/USSD are dropped; the data plan feature is not wanted for now.
 - Full per-feature status is in FEATURES.md; per-screen status in DESIGN.md §17.
 
 ## 2. Environment
@@ -85,6 +85,7 @@ Before saying a task is done: `tsc`, `lint` and `test` pass, and the change was 
 | Non-secret prefs | `@react-native-async-storage/async-storage` |
 | UI | `react-native-safe-area-context`, `@expo/vector-icons` (Ionicons) + `expo-font`, `react-native-svg` |
 | Phone IP ("this phone") | `expo-network` |
+| Antenna mode | `expo-keep-awake` (screen on), `expo-haptics` (buzz on a new best) |
 | Wi-Fi QR code | `qrcode` (exact `1.5.4`, MIT; only `create()` is used, drawn with `react-native-svg`) |
 | Build config | `expo-build-properties` + `plugins/withRouterNetworkSecurity.js` (§8.6) |
 | Release | `babel-plugin-transform-remove-console` in production (`babel.config.js`) |
@@ -108,7 +109,9 @@ src/
     (tabs)/router.tsx         # router management (status, Wi-Fi, mobile data, security, reboot)
     (tabs)/settings.tsx       # the app only (account, router address, version)
     device/[mac].tsx          # device detail: name, type, known/new, details
-    # planned: antenna.tsx
+    antenna.tsx               # antenna positioning mode (signal every second)
+    guest-wifi.tsx            # guest network: switch, name, security, auto-off, QR; screenshot-blocked
+    lte-band.tsx              # LTE band lock (Automatic or one band)
   api/
     client.ts                 # session cookie, token rotation, request queue, timeout, RSA bodies
     auth.ts                   # state-login, login, logout, admin password change
@@ -125,11 +128,11 @@ src/
     deviceAuth.ts             # biometric / device PIN re-auth
     redact.ts                 # redaction for logs/errors
     routerIdentity.ts         # router fingerprint pinning (§8.5)
-  state/                      # AuthProvider, SnackbarProvider, queryClient, devicePrefs (nicknames/known, AsyncStorage)
+  state/                      # AuthProvider, SnackbarProvider, AppLockProvider (+ appLock timing), queryClient, devicePrefs (nicknames/known, AsyncStorage)
   hooks/                      # react-query hooks (useTraffic, useSignal, useHosts, ...)
   components/                 # DESIGN.md §7 components
   theme/                      # colors.ts, typography.ts, spacing.ts (DESIGN.md §3–5)
-  utils/                      # formatters, signal rating, devices (grouping/titles), vendor + ouiData (maker from MAC)
+  utils/                      # formatters, signal rating, devices (grouping/titles), vendor + ouiData (maker from MAC), bands (LTE masks), antenna (best/trend)
 plugins/withRouterNetworkSecurity.js   # cleartext only to the router (§8.6)
 ```
 
@@ -154,6 +157,9 @@ Layer rule: `src/app/` → `hooks/` + `state/` → `api/` + `security/`. Screens
   - Slots: `wifimaxmacfilternum` from `wlan/wifi-feature-switch`, else 10. A router in allow-list mode is left alone (`allow_list`). With `enable=0` the list is kept but not enforced; the first block turns it on for every device already listed (the confirm dialog says so).
   - Only Wi-Fi devices (the web page hides the switch for Ethernet). The app refuses this phone.
   - Also on that page, not built: `POST lan/changedevicename` (`ID`, `ActualName`, max 64 bytes) renames a device on the router; `POST lan/HostInfo` (`ID=0`, `MacAddress`) removes a not-connected device from the list.
+- **Automatic restart** (router's `systemsettings.js`): `GET/POST diagnosis/time_reboot` → `enable`, `dayinterval`, `begintime`, `endtime` (minutes after midnight). The web page only flips `enable` and posts the four values back; the app does the same.
+- **LTE band** (router's `mobilesearch.js`): `GET net/net-mode` → `NetworkMode` (`03` = 4G only), `NetworkBand`, `LTEBand` (hex mask, bit n − 1 = band n). `GET net/net-mode-list` → `AccessList` (this router: only `03`, so there is no network-mode choice) and `LTEBandList` (the router's own band set, unnamed, `a000000095` = bands 1, 3, 5, 8, 38, 40, plus "All bands"). `POST net/net-mode` with the three values; the page waits 45 s. **The page only offers the listed masks; a single-band mask is the app's own addition and is unverified on this router.**
+- **Guest Wi-Fi** (router's `guestwifi.js`): the `multi-basic-settings` entry with `wifiisguestnetwork=1` (ID `...Ssid.2.`); `wifiguestofftime` 0 = never, 4 = 4 hours, 24 = 1 day. Switch: plain `POST wlan/multi-basic-settings` with **all** entries, names and secrets left out (`clearSecureData`), guest `WifiEnable` set, `WifiRestart=1`. Save: `;enp`, **only** the guest entry, `WifiAuthmode` `OPEN` (+ `WifiBasicencryptionmodes=NONE`) or `WPA/WPA2-PSK` (+ `WifiWpaencryptionmodes=MIX`, key `RSA(wifiEncode(password))` in `WifiWpapsk` and `MixWifiWpapsk`, omitted when unchanged). `GET wlan/guesttime-setting` → `remaintime` (seconds), `extendtime` (minutes); `POST` `{extendtime}` keeps it on longer.
 - Without a session cookie every API path answers `125002`; with an anonymous session every path answers `100003`, **even paths that don't exist**. So an endpoint can only be checked from a logged-in session.
 - HiLink returns a single child as an object and several as an array; always normalize with `toArray()`.
 - RSA (`encrypt_enabled=1`): key from `GET /api/webserver/publickey` (2048-bit, e=65537 on this router). Padding from `rsapadingtype` in `state-login` (`1` = OAEP with SHA-1, as on this router; else PKCS#1 v1.5). **Scheme (from the router's web UI `doRSAEncrypt`, emui webui 6):** base64(UTF-8 XML) → blocks of 214 chars (OAEP) / 245 (PKCS#1) → RSA each block → concatenate as hex; POST with `Content-Type: application/x-www-form-urlencoded; charset=UTF-8;enc`. Implemented in `crypto.ts` `rsaEncryptHex` + `client.post(..., { encrypt })`.
@@ -256,7 +262,7 @@ Layer rule: `src/app/` → `hooks/` + `state/` → `api/` + `security/`. Screens
 ### 8.7 Data at rest and on screen
 
 - **Do not persist** SMS, USSD replies, IMEI, IMSI, ICCID, phone numbers, tokens or full host lists. The react-query cache is memory only and is cleared on logout/background timeout.
-- AsyncStorage may hold only: refresh interval, router address, device notes keyed by MAC (nickname, type, "known" mark; `state/devicePrefs.ts`, never the router's host list itself), data plan display prefs, antenna mode best value.
+- AsyncStorage may hold only: refresh interval, router address, device notes keyed by MAC (nickname, type, "known" mark; `state/devicePrefs.ts`, never the router's host list itself), app lock on/off, data plan display prefs, antenna mode best value.
 - `android.allowBackup: false` (no ADB/cloud backup of app data).
 - **Block screenshots and the recents preview** (`expo-screen-capture`) on: Login, Wi-Fi password view/edit, Wi-Fi QR, Change admin password, Device information (IMEI/IMSI).
 - Wi-Fi password is hidden by default. Revealing it requires device re-auth (biometric/PIN).
@@ -264,7 +270,7 @@ Layer rule: `src/app/` → `hooks/` + `state/` → `api/` + `security/`. Screens
 
 ### 8.8 App lock and re-authentication
 
-- Optional **app lock** (Settings → App): biometric / device PIN via `expo-local-authentication` when the app opens or returns after > 1 minute in background.
+- Optional **app lock** (Settings → Security, `state/AppLockProvider.tsx`): biometric / device PIN via `expo-local-authentication` when the app opens or returns after > 1 minute in background. Turning it on or off needs device re-auth. If the phone's screen lock was removed afterwards, the cover says so and lets the owner in (there is nothing left to ask for).
 - **Always require device re-auth** (even if app lock is off) for: reboot, factory reset, Wi-Fi name/password change, reveal/copy Wi-Fi password, admin password change, MAC block, "Trust new router", enabling "Remember password".
 - If the device has no screen lock set, the sensitive action is **blocked** with a message asking the user to set a screen lock (stricter than a password fallback).
 
@@ -312,8 +318,8 @@ This app controls a **real, in-use router**. The laptop and phone depend on it f
 
 1. **Phase 1 (MVP): built.** Project setup, theme tokens, security modules (§8.2–8.6), router detection, no-login dashboard, login/session, signal, devices (Wi-Fi + cable), mobile data toggle, reboot, app icon. Remaining: phone tests of logout, mobile data switch, reboot, remember password (each needs the user's go-ahead, §9).
 2. **Release (pending user decision):** standalone APK with the icon via EAS Build or a local Android SDK build. Release signing: keystore **outside the repo**, wired with a config plugin (never hand-edit `android/`).
-3. **Phase 2 (Router tab first):** ~~change admin password, Wi-Fi settings (RSA) + Wi-Fi QR~~ (built, not yet run on the router), data plan, automatic reboot, device detail + MAC block, network mode; then antenna positioning mode, app lock, feature-flag hiding. Done: speed chart, monthly usage, Router tab. **SMS/USSD dropped** (owner's choice, 2026-09-29).
-4. **Phase 3:** band lock, APN, notifications, widget, languages, factory reset.
+3. **Phase 2 (Router tab first):** Built and still to be run on the router or checked on the phone: change admin password, Wi-Fi settings + QR, device management + blocking, guest Wi-Fi, automatic restart, LTE band lock, antenna positioning mode, app lock. Done: speed chart, monthly usage, Router tab. Not started: data plan (owner doesn't need it for now), feature-flag hiding. Network mode is not applicable (this router is 4G only). **SMS/USSD dropped** (owner's choice, 2026-09-29).
+4. **Phase 3:** APN, notifications, widget, languages, factory reset.
 
 Security modules are built **first**, not added later.
 
@@ -330,7 +336,7 @@ Security modules are built **first**, not added later.
 - Unit tests (Jest) with **mocked** router responses for: password hash, token rotation, request queue, XML escaping/parsing, error mapping, all validators, redaction, router address validation, fingerprint check, session timeout, lockout handling.
 - Security tests are required for every function in `src/security/` and `src/api/xml.ts`/`validate.ts`.
 - Manual check on the phone (Expo Go) before marking a feature ✅ in FEATURES.md.
-- Current suites (`__tests__/` next to the code): `xml`, `crypto`, `validate`, `client`, `hosts`, `monitoring`, `device`, `rsa`, `password`, `secret`, `reveal`, `wifi`, `macfilter` (API); `redact`, `session`, `routerIdentity`, `rebootGate` (security); `format`, `chart`, `usage`, `wifiQr`, `devices`, `vendor` (utils); `devicePrefs` (state). 170 tests.
+- Current suites (`__tests__/` next to the code): `xml`, `crypto`, `validate`, `client`, `hosts`, `monitoring`, `device`, `rsa`, `password`, `secret`, `reveal`, `wifi`, `macfilter`, `routerSettings` (API); `redact`, `session`, `routerIdentity`, `rebootGate` (security); `format`, `chart`, `usage`, `wifiQr`, `devices`, `vendor`, `bands`, `antenna` (utils); `devicePrefs`, `appLock` (state). 200 tests.
 - Jest mock factories may only reference variables whose names start with `mock` (e.g. `const mockGet = jest.fn()`).
 - TypeScript 6 no longer auto-includes `@types/*`: `tsconfig.json` lists `"types": ["jest", "node"]`. Add new global type packages there.
 

@@ -2,6 +2,8 @@ import type { TextStyle } from 'react-native';
 
 // DESIGN.md §4 — system font, sizes / line heights / weights.
 export const typography = {
+  // Antenna positioning mode only: one number readable from across the room.
+  hero: { fontSize: 56, lineHeight: 64, fontWeight: '600' },
   display: { fontSize: 32, lineHeight: 38, fontWeight: '600' },
   title: { fontSize: 22, lineHeight: 28, fontWeight: '600' },
   heading: { fontSize: 17, lineHeight: 24, fontWeight: '600' },

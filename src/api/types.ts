@@ -152,10 +152,11 @@ export interface WifiSsidRaw {
   Index?: string;
   ID?: string; // e.g. InternetGatewayDevice.X_Config.Wifi.Radio.1.Ssid.1.
   WifiSsid?: string;
+  wifiisguestnetwork?: string; // "1" = the guest network
+  wifiguestofftime?: string; // guest auto-off: 0 = never, 4 = 4 hours, 24 = 1 day
   WifiEnable?: string;
   WifiBroadcast?: string; // 0 = visible, 1 = hidden
   WifiAuthmode?: string; // WPA2-PSK, OPEN, ...
-  wifiisguestnetwork?: string;
   WifiWpapsk?: string; // only filled in the decrypted user/pwd reply
   [key: string]: string | undefined;
 }
@@ -255,4 +256,60 @@ export interface WifiNetwork {
   enabled: boolean;
   hidden: boolean;
   security: string; // WifiAuthmode, e.g. WPA2-PSK
+}
+
+/** diagnosis/time_reboot: the router restarts itself every N days inside a time window. */
+export interface TimeRebootRaw {
+  enable?: string;
+  dayinterval?: string;
+  begintime?: string; // minutes after midnight
+  endtime?: string;
+}
+
+export interface RebootSchedule {
+  enabled: boolean;
+  everyDays: number;
+  /** Minutes after midnight. */
+  fromMinute: number;
+  toMinute: number;
+}
+
+/** net/net-mode */
+export interface NetModeRaw {
+  NetworkMode?: string; // 03 = 4G only, 00 = auto
+  NetworkBand?: string;
+  LTEBand?: string; // hex mask, bit (n − 1) = band n
+}
+
+/** net/net-mode-list */
+export interface NetModeListRaw {
+  LTEBandList?: { LTEBand?: { Name?: string; Value?: string } | { Name?: string; Value?: string }[] } | '';
+}
+
+export interface LteBands {
+  /** Hex mask in use now. */
+  current: string;
+  /** Hex mask of every band this router can use ("Automatic"). */
+  supported: string;
+}
+
+export type GuestOffTime = '0' | '4' | '24';
+
+export interface GuestNetwork {
+  ssid: string;
+  enabled: boolean;
+  /** No password: anyone nearby can join. */
+  open: boolean;
+  /** Turns itself off after this many hours; 0 = never. */
+  offTime: GuestOffTime;
+  /** Seconds until it turns off (0 when off or unlimited). */
+  remainSeconds: number;
+  /** Minutes one "extend" adds. */
+  extendMinutes: number;
+}
+
+export interface GuestTimeRaw {
+  extendtime?: string;
+  isvalidtime?: string;
+  remaintime?: string;
 }

@@ -19,6 +19,8 @@ export interface PostOptions {
    * (Wi-Fi settings). Ignored when `encrypt` is set, which always sends ";enc".
    */
   typeSuffix?: string;
+  /** Longer wait for slow router actions (e.g. re-registering on a band). Default 8 s. */
+  timeoutMs?: number;
 }
 
 /**
@@ -105,7 +107,7 @@ export class RouterClient {
       : options.typeSuffix
         ? `${FORM_TYPE};${options.typeSuffix}`
         : FORM_TYPE;
-    const res = await this.send(path, 'POST', payload, token, type);
+    const res = await this.send(path, 'POST', payload, token, type, options.timeoutMs);
     try {
       return parseResponse<T>(res.text);
     } catch (e) {
@@ -156,6 +158,7 @@ export class RouterClient {
     body?: string,
     token?: string,
     contentType: string = FORM_TYPE,
+    timeoutMs: number = TIMEOUT_MS,
   ): Promise<RawResponse> {
     const headers: Record<string, string> = { 'X-Requested-With': 'XMLHttpRequest' };
     if (this.sessionId) headers.Cookie = `SessionID=${this.sessionId}`;
@@ -163,7 +166,7 @@ export class RouterClient {
     if (body) headers['Content-Type'] = contentType;
 
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const res = await fetch(`http://${this.host}${path}`, {
         method,

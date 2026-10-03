@@ -3,9 +3,24 @@ import { useEffect } from 'react';
 
 import { routerClient } from '@/api/client';
 import { getBlockList, setBlocked } from '@/api/endpoints/macfilter';
-import { getWifiNetwork, revealWifiPassword, saveWifiNetwork } from '@/api/endpoints/wifi';
+import {
+  extendGuestTime,
+  getGuestNetwork,
+  getWifiNetwork,
+  revealWifiPassword,
+  saveGuestNetwork,
+  saveWifiNetwork,
+  setGuestEnabled,
+} from '@/api/endpoints/wifi';
 import { getHosts } from '@/api/endpoints/wlan';
-import { getBasicInformation, getRouterDetails, getSignal, rebootRouter } from '@/api/endpoints/device';
+import {
+  getBasicInformation,
+  getRebootSchedule,
+  getRouterDetails,
+  getSignal,
+  rebootRouter,
+  setRebootScheduleEnabled,
+} from '@/api/endpoints/device';
 import { getMobileData, setMobileData } from '@/api/endpoints/dialup';
 import {
   getDataPlan,
@@ -14,7 +29,7 @@ import {
   getStatus,
   getTrafficStatistics,
 } from '@/api/endpoints/monitoring';
-import { getOperator } from '@/api/endpoints/net';
+import { getLteBands, getOperator, setLteBand } from '@/api/endpoints/net';
 import { isRouterError } from '@/api/errors';
 import { useAuth } from '@/state/AuthProvider';
 import { useSnackbar } from '@/state/SnackbarProvider';
@@ -25,6 +40,7 @@ export function routerHost(): string {
 }
 
 // Polling intervals (AGENTS.md §6).
+const ANTENNA = 1000;
 const FAST = 3000;
 const NORMAL = 5000;
 const SLOW = 15000;
@@ -128,6 +144,94 @@ export function useSignal(focused: boolean) {
   });
 }
 
+/** Signal every second, for antenna positioning mode only. */
+export function useSignalFast(focused: boolean) {
+  const { status } = useAuth();
+  return useQuery({
+    queryKey: ['signal'],
+    queryFn: getSignal,
+    enabled: status === 'logged_in' && focused,
+    refetchInterval: every(focused, ANTENNA),
+    staleTime: 0,
+    meta: AUTH_META,
+  });
+}
+
+/** The router's own scheduled restart. */
+export function useRebootSchedule(focused: boolean) {
+  const { status } = useAuth();
+  return useQuery({
+    queryKey: ['rebootSchedule'],
+    queryFn: getRebootSchedule,
+    enabled: status === 'logged_in',
+    refetchInterval: every(focused, SLOW * 4),
+    meta: AUTH_META,
+  });
+}
+
+export function useSetRebootSchedule() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: setRebootScheduleEnabled,
+    onSuccess: (_d, enabled) =>
+      queryClient.setQueryData(['rebootSchedule'], (old: unknown) =>
+        old && typeof old === 'object' ? { ...old, enabled } : old,
+      ),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['rebootSchedule'] }),
+  });
+}
+
+/** LTE bands in use and supported. */
+export function useLteBands(focused: boolean) {
+  const { status } = useAuth();
+  return useQuery({
+    queryKey: ['lteBands'],
+    queryFn: getLteBands,
+    enabled: status === 'logged_in' && focused,
+    meta: AUTH_META,
+  });
+}
+
+export function useSetLteBand() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: setLteBand,
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['lteBands'] });
+      void queryClient.invalidateQueries({ queryKey: ['signal'] });
+    },
+  });
+}
+
+/** Guest Wi-Fi (never contains its password). */
+export function useGuestNetwork(focused: boolean) {
+  const { status } = useAuth();
+  return useQuery({
+    queryKey: ['guestNetwork'],
+    queryFn: getGuestNetwork,
+    enabled: status === 'logged_in',
+    refetchInterval: every(focused, SLOW),
+    meta: AUTH_META,
+  });
+}
+
+function useGuestMutation<T>(mutationFn: (input: T) => Promise<void>) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn,
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['guestNetwork'] }),
+  });
+}
+
+export const useSetGuestEnabled = () => useGuestMutation(setGuestEnabled);
+export const useSaveGuestNetwork = () => useGuestMutation(saveGuestNetwork);
+export const useExtendGuestTime = () => useGuestMutation(extendGuestTime);
+
+/** Reads the guest Wi-Fi password on demand; like useRevealWifiPassword, never cached. */
+export function useRevealGuestPassword(): () => Promise<string> {
+  return () => revealWifiPassword(true);
+}
+
 export function useHosts(focused: boolean) {
   const { status } = useAuth();
   return useQuery({
@@ -198,7 +302,7 @@ export function useWifiNetwork(focused: boolean) {
  * sit in the react-query cache (AGENTS.md §8.7). Callers keep it in screen state only.
  */
 export function useRevealWifiPassword(): () => Promise<string> {
-  return revealWifiPassword;
+  return () => revealWifiPassword();
 }
 
 export function useSaveWifiNetwork() {

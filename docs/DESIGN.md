@@ -75,6 +75,7 @@ Use the **system font** (matches Samsung One UI; no custom font download). Numbe
 | Token | Size / line height | Weight | Use |
 |---|---|---|---|
 | `display` | 32 / 38 | 600 | Hero numbers (speed, data used) |
+| `hero` | 56 / 64 | 600 | Antenna mode only: one number readable from across the room |
 | `title` | 22 / 28 | 600 | Screen titles |
 | `heading` | 17 / 24 | 600 | Card titles |
 | `body` | 15 / 22 | 400 | Normal text, list items |
@@ -199,7 +200,7 @@ Wireframes are at 384 dp width.
 
 - **Phase 1 as built:** rating card, metrics card (RSRP, SINR, RSRQ with bar + rating; RSSI value only), cell info line, and "What do these numbers mean?" as a plain card. No antenna-mode button yet.
 
-**Antenna mode** (Phase 2, full screen): one huge SINR/RSRP value + rating color background band (soft color only), updates every 1 s, optional beep/vibration on change, "Best so far: −82 dBm" line. Keep screen awake while open.
+**Antenna mode** (sub-screen "Find best position", opened from the secondary button **Find best router position** on the Signal tab): a soft-colored band by rating with signal bars, one huge RSRP number (`hero`, 56 sp) + "dBm", the rating word, and a caption "▲ Getting stronger · Quality (SINR) 6 dB · Band 3". Card **Best so far**: the best RSRP, a chip "● Best spot" (success) or "4 dB weaker now" (neutral), a bar history of the last 30 readings (the best ones solid, the rest faded), **Start again**. Group **Feedback**: "Vibrate on a new best" switch (on by default). Card **How to use this**: three numbered steps. Refreshes every second; the screen stays on while the page is open.
 
 ### 9.3 Devices
 
@@ -271,11 +272,14 @@ Danger zone                             red group title
 - Logged out: status card + one card "Log in to manage your router: mobile data, reboot and more." with a Log in button.
 - **Change admin password** (sub-screen, back arrow + title, screenshot-blocked): Current / New (strength hint Weak · Medium · Strong + rules caption) / Confirm; "Change password" → dialog "Change admin password? You'll be logged out and must log in with the new password. If you forget it, the router has to be reset." → fingerprint/PIN → on success snackbar "Password changed. Log in with your new password." and the login screen opens (router ends the session; a saved password is forgotten). Wrong current password → inline "Current password is incorrect."; too many wrong tries (108008) → logged out.
 - **Wi-Fi screen** (sub-screen, screenshot-blocked): card "Your Wi-Fi" (Name, Security, Visible to others, Password `••••••••`) + **Show password** (fingerprint/PIN each time the screen opens); card "Share with guests" + **Show QR code** (fingerprint/PIN; dark-on-white QR, 232 dp); card "Change Wi-Fi": name, new password (empty = keep), confirm (appears when typing), "Hide network" switch, **Save changes** → dialog "Change Wi-Fi? Your phone will disconnect. Reconnect using the new password." → fingerprint/PIN. Caption: saving restarts Wi-Fi; cable devices stay connected. If the phone drops before the answer: snackbar "Your phone lost the Wi-Fi. The change was probably saved: reconnect with the new details."
-- **Next (planned):** Internet (monthly data plan, network mode), Security (blocked devices), Maintenance (automatic reboot, reboot router).
+- **Guest Wi-Fi** (sub-screen, screenshot-blocked; row "Guest Wi-Fi · On/Off" in the Wi-Fi group): card with the network name, "On · turns off in 3 h 12 min" / "Off", a switch, a chip "Password protected" (success) or "No password" (warning), and **Keep on 30 more minutes** while a timer runs; card **Share with guests** with **Show QR code** (fingerprint/PIN when it has a password); card **Settings**: Name, Security (`ChoiceChips`: Password / No password, with an orange warning line for open), password field ("Leave empty to keep the current one"), Turn off automatically (4 hours / 1 day / Never), **Save changes**. The switch and Save each confirm ("The Wi-Fi restarts, so your phone drops for a few seconds…") and need fingerprint/PIN.
+- **4G band** (sub-screen; row "4G band · Band 3" in the Internet group): card **Right now** (band + frequency, strength and quality, rating chip, live); card **Use this band** as a radio list: Automatic ("Recommended. The router picks from bands 1, 3, 5, 8, 38, 40.") then one row per band, "In use right now" under the active one. Choosing a row → dialog "Use only Band 3? … If your operator doesn't use it here, the internet stops until you choose Automatic again." → fingerprint/PIN. Caption explains when locking helps and that the app keeps working if the internet stops.
+- **Maintenance** group: **Automatic restart** switch with the router's schedule as subtitle ("Every 7 days, between 01:00 and 05:00").
+- **Next (planned):** Internet (monthly data plan).
 
 ### 9.5 Settings
 
-Grouped list (group title in `label` + `textSecondary`). **As built:** only the app itself: Account (Log in / Log out, Forget saved password), App (Router address read-only, Version). Router controls moved to the Router tab (§9.4). The target layout below is kept for reference; its Wi-Fi / Data / Network / Router / Danger zone groups now belong in the Router tab:
+Grouped list (group title in `label` + `textSecondary`). **As built:** only the app itself: Account (Log in / Log out, Forget saved password), Security (**App lock** switch: "Ask for fingerprint or PIN when the app opens"; turning it on or off asks for fingerprint/PIN), App (Router address read-only, Version). While locked, a full-screen cover shows a lock tile, "R App is locked" and **Unlock**; it appears when the app opens and after more than a minute away. Router controls moved to the Router tab (§9.4). The target layout below is kept for reference; its Wi-Fi / Data / Network / Router / Danger zone groups now belong in the Router tab:
 
 ```
 Wi-Fi
@@ -331,6 +335,8 @@ Every screen and card handles these; design them, don't leave blank screens.
 | Reboot | Dialog: "Reboot router? Internet will be off for about 1–2 minutes." → **Reboot** → fingerprint/PIN |
 | Mobile data off | Dialog: "Turn off mobile data? All devices will lose internet until you turn it back on." (turning on needs no dialog) |
 | Change Wi-Fi name/password | Dialog: "Your phone will disconnect. Reconnect using the new password." |
+| Guest Wi-Fi on / off / save | Dialog: "Turn on guest Wi-Fi? … The Wi-Fi restarts, so your phone drops for a few seconds." (adds "It has no password, so anyone nearby can join." for an open network) → fingerprint/PIN |
+| Lock a 4G band | Dialog: "Use only Band 3? The router reconnects on this band only. If your operator doesn't use it here, the internet stops until you choose Automatic again." → **Use this band** (red) → fingerprint/PIN. Back to Automatic: plain dialog → fingerprint/PIN |
 | Block device | Dialog "Block <name>? It will be disconnected and can't use your Wi-Fi until you unblock it." → **Block** (red) → fingerprint/PIN. Unblock: "Unblock <name>? It will be able to connect to your Wi-Fi again." → **Unblock** → fingerprint/PIN |
 | Send SMS / USSD | (dropped with the Messages tab) Dialog showing number/code (may cost money) |
 | Factory reset | Two steps: dialog, then type `RESET` to enable the button |
@@ -392,11 +398,11 @@ After reboot: full-screen waiting screen ("Rebooting your router…", spinner). 
 |---|---|
 | Theme tokens, components | ✅ Built |
 | Home (9.1) | ✅ Built incl. speed chart and monthly usage card |
-| Signal (9.2) | ✅ Built; antenna mode in Phase 2 |
+| Signal (9.2) | ✅ Built · 🔨 antenna mode (built, not yet checked on the phone) |
 | Devices (9.3) | ✅ List (Wi-Fi + cable) · 🔨 new / connected / blocked / not connected groups, device detail and block / unblock (built, not yet checked on the phone) |
-| Router (9.4) | ✅ Status card, mobile data, reboot · 🔨 Wi-Fi screen, change admin password (built, not yet run on the router); more groups in Phase 2 |
-| Settings (9.5) | ✅ App only (account, router address, version) |
+| Router (9.4) | ✅ Status card, mobile data, reboot · 🔨 Wi-Fi screen, guest Wi-Fi, 4G band, automatic restart, change admin password (built, not yet run on the router) |
+| Settings (9.5) | ✅ Account, router address, version · 🔨 app lock |
 | Login (9.6) | ✅ Built, screenshot-blocked |
 | States (10) | ✅ Built except "stale data" line |
-| Dangerous actions (11) | 🔨 Reboot, mobile data off, Wi-Fi change, admin password change, block device built; factory reset later |
+| Dangerous actions (11) | 🔨 Reboot, mobile data off, Wi-Fi change, guest Wi-Fi change, 4G band change, admin password change, block device built; factory reset later |
 | App icon (16) | ✅ Generated; visible after standalone build |

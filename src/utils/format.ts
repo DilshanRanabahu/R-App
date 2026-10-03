@@ -38,3 +38,9 @@ export function formatDuration(totalSeconds: number): string {
   if (m > 0) return `${m} min`;
   return `${s} s`;
 }
+
+/** Minutes after midnight → "01:00" (24-hour, like the router shows it). */
+export function formatClock(minutes: number): string {
+  const m = ((Math.floor(minutes) % 1440) + 1440) % 1440;
+  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+}

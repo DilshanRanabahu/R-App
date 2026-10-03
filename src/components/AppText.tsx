@@ -10,7 +10,7 @@ interface AppTextProps extends TextProps {
 }
 
 // Hero numbers are capped so large font scales don't break layouts (DESIGN.md §4).
-const MAX_SCALE: Partial<Record<TypographyVariant, number>> = { display: 1.3, title: 1.4 };
+const MAX_SCALE: Partial<Record<TypographyVariant, number>> = { hero: 1.2, display: 1.3, title: 1.4 };
 
 export function AppText({
   variant = 'body',

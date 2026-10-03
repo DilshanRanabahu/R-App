@@ -24,7 +24,7 @@ A React Native (Expo) app for managing a Huawei B312-926 (HUAWEI 4G Router 2s) f
 | Built, not yet exercised | Logout, remember password, session expiry / idle logout, mobile data **switching**, reboot + waiting screen, "Trust new router" flow; Phase 2: change admin password, Wi-Fi name/password/hide, show Wi-Fi password, Wi-Fi QR |
 | Security built | Router fingerprint pinning, encrypted password storage (opt-in), login attempt limiter, idle/background logout, screenshot blocking, device re-auth for risky actions, cleartext only to the router, log redaction |
 | App icon | Designed and generated (`assets/`); visible only after a standalone build |
-| Tests | 170 unit tests passing; type check + lint clean |
+| Tests | 200 unit tests passing; type check + lint clean |
 
 ## Legend
 
@@ -72,9 +72,9 @@ A React Native (Expo) app for managing a Huawei B312-926 (HUAWEI 4G Router 2s) f
 | 3.1 | Signal details: RSRP, RSRQ, SINR, RSSI | P1 | `GET /api/device/signal` | Yes | ✅ | ✅ |
 | 3.2 | Signal quality rating (Excellent / Good / Fair / Poor) + advice sentence | P1 | computed from 3.1 | — | — | ✅ |
 | 3.3 | Cell info: Cell ID, PCI, band | P2 | `GET /api/device/signal` | Yes | ✅ | ✅ |
-| 3.4 | **Antenna positioning mode**: fast refresh + beep/vibrate by signal level to find the best spot for the router | P2 | `GET /api/device/signal` (1 s polling) | Yes | — | ⬜ |
-| 3.5 | Network mode (Auto / 4G only / 3G only) | P2 | `GET/POST /api/net/net-mode`, `/api/net/net-mode-list` | Yes | ⏳ | ⬜ |
-| 3.6 | LTE band lock | P3 | `POST /api/net/net-mode` (`LTEBand`) | Yes | ⏳ | ⬜ |
+| 3.4 | **Antenna positioning mode**: signal every second, best value so far, short history, vibration on a new best, screen kept on | P2 | `GET /api/device/signal` (1 s polling) | Yes | ✅ | 🔨 |
+| 3.5 | Network mode (Auto / 4G only / 3G only) | — | `GET /api/net/net-mode-list` | Yes | ✅ | ✖ not applicable: this router lists only `03` (4G only) |
+| 3.6 | LTE band lock: Automatic or one band (this router: 1, 3, 5, 8, 38, 40); confirm + fingerprint/PIN | P2 | `GET /api/net/net-mode`, `/api/net/net-mode-list`; `POST /api/net/net-mode` (`LTEBand` mask) | Yes | ✅ GET · ⏳ POST (single-band masks are not offered by the router's own page) | 🔨 |
 | 3.7 | Manual operator scan / selection | P3 | `GET /api/net/plmn-list`, `POST /api/net/register` | Yes | ⏳ | ⬜ |
 
 > Current signal on this router is **Poor** (RSRP ≈ −105 dBm, SINR ≈ 4–6 dB), so 3.4 is the most useful next signal feature.
@@ -125,7 +125,7 @@ Removed on 2026-09-29 (owner's choice): the owner doesn't need SMS or USSD in th
 | 9.2 | View / change Wi-Fi password (reveal needs fingerprint/PIN; screenshot-blocked) | P2 | reveal: `POST /api/user/pwd` (RSA nonce → AES reply + HMAC); change: `WifiWpapsk` RSA-encrypted in `multi-basic-settings` | Yes | ⏳ | 🔨 |
 | 9.3 | Show Wi-Fi QR code for guests to scan (screenshot-blocked) | P2 | app-side (`WIFI:T:WPA;S:...;P:...;;`, `qrcode` lib + SVG) | — | — | 🔨 |
 | 9.4 | Wi-Fi on/off (warn: phone will disconnect) | P3 | `POST /api/wlan/wifi-feature-switch` | Yes | ⏳ | ⬜ |
-| 9.5 | Guest / multi-SSID | P3 | `multi-basic-settings` (`multssid_enable=1`) | Yes | ⏳ | ⬜ |
+| 9.5 | Guest Wi-Fi: on/off, name, password or open, auto-off (4 h / 1 day / never), extend time, QR code (screenshot-blocked) | P2 | `GET/POST /api/wlan/multi-basic-settings` (entry with `wifiisguestnetwork=1`), `GET/POST /api/wlan/guesttime-setting`, `POST /api/user/pwd` | Yes | ✅ GET · ⏳ POST | 🔨 |
 | 9.6 | Wi-Fi channel / bandwidth | P3 | `GET/POST /api/wlan/multi-basic-settings` | Yes | ⏳ | ⬜ |
 
 ## 10. Device & system
@@ -138,6 +138,7 @@ Removed on 2026-09-29 (owner's choice): the owner doesn't need SMS or USSD in th
 | 10.4 | Firmware update check | P3 | `GET /api/online-update/check-new-version` | Yes | ⏳ | ⬜ |
 | 10.5 | Feature flags (hide unsupported screens) | P1 | `GET /api/global/module-switch` | No | ✅ | 🔨 (endpoint ready, not yet used to hide screens) |
 | 10.6 | Factory reset (double confirmation, type `RESET`) | P3 | `POST /api/device/control` | Yes | ⏳ | ⬜ |
+| 10.7 | Automatic restart on/off (the router's own schedule: every N days in a night window; shown, not editable, like the web page) | P2 | `GET/POST /api/diagnosis/time_reboot` | Yes | ✅ GET · ⏳ POST | 🔨 |
 
 ## 11. App features (not router API)
 
@@ -165,7 +166,7 @@ Removed on 2026-09-29 (owner's choice): the owner doesn't need SMS or USSD in th
 | 12.5 | Device re-auth (fingerprint/PIN) for risky actions; blocked if the phone has no screen lock | P1 | 🔨 reboot, "Trust new router", Wi-Fi change, show Wi-Fi password / QR, admin password change |
 | 12.6 | Cleartext HTTP allowed only to the router in release builds (config plugin) | P1 | 🔨 (applies to standalone builds) |
 | 12.7 | Log redaction + `console` stripped from release builds | P1 | ✅ |
-| 12.8 | App lock on open (optional, fingerprint/PIN) | P2 | ⬜ |
+| 12.8 | App lock on open and after 1 minute away (optional, fingerprint/PIN; Settings → Security) | P2 | 🔨 |
 | 12.9 | Clipboard auto-clear after copying the Wi-Fi password | P2 | ⬜ |
 
 ---
@@ -176,18 +177,21 @@ Removed on 2026-09-29 (owner's choice): the owner doesn't need SMS or USSD in th
 Tabs
 ├── Home        → 2.x dashboard + speed chart + top/average, session ↓/↑ split,
 │                 4.1 monthly usage (today / this month, plan bar) — no login needed    ✅
-├── Signal      → 3.x details (antenna mode ⬜)                                        ✅
+├── Signal      → 3.x details ✅ · "Find best router position" → antenna mode (3.4) 🔨
 ├── Devices     → 8.x Wi-Fi + cable devices ✅ · new / connected / not connected groups,
 │                 device detail (name, type, maker, block / unblock) 🔨
 ├── Router      → status card (name, Online, running time, firmware) ✅, Wi-Fi (9.1–9.3 🔨),
-│                 Internet (5.1 mobile data) ✅, Security (1.9 admin password 🔨), Danger zone
-│                 (10.2 reboot) ✅ · next: data plan (4.2), auto reboot, blocked devices (8.4),
-│                 network mode (3.5) ⬜
-└── Settings    → the app only: Account (log in/out, forget password), App (router address, version) ✅
+│                 guest Wi-Fi (9.5) 🔨, Internet (5.1 mobile data ✅, 4G band 3.6 🔨), Security (1.9
+│                 admin password 🔨), Maintenance (10.7 automatic restart 🔨), Danger zone (10.2 reboot) ✅
+│                 · next: data plan (4.2)
+└── Settings    → the app only: Account (log in/out, forget password), Security (app lock 🔨), App ✅
 Login (modal)   → 1.x, 12.1, 12.2, 12.4                                                ✅
 Rebooting       → 10.2 waiting screen                                                  🔨
 Wi-Fi           → 9.1–9.3 name, show password, QR, change (screenshot-blocked)           🔨
 Change password → 1.9 (screenshot-blocked)                                              🔨
+Antenna         → 3.4 find the best router position                                    🔨
+Guest Wi-Fi     → 9.5 (screenshot-blocked)                                              🔨
+4G band         → 3.6 band lock                                                         🔨
 ```
 
 ## Build phases
@@ -195,8 +199,8 @@ Change password → 1.9 (screenshot-blocked)                                    
 1. **Phase 1 (MVP)**: ✅ project setup, router detection, no-login dashboard, login + token handling, signal, devices (Wi-Fi + cable), data toggle, reboot, security modules, app icon.
    - Remaining: test on the phone the logout, mobile data switch, reboot and remember-password flows.
 2. **Release (pending decision)**: standalone APK with the icon. Choose EAS cloud build (needs a free Expo account) or a local build (needs the Android SDK, ~4–5 GB). See [Release](#release).
-3. **Phase 2 (Router tab first)**: data plan, automatic reboot (`autoreboot_enable=1` on this router), device details + MAC block, network mode; then antenna positioning mode, app lock. Done: speed chart, monthly usage, Router tab. Built, not yet run on the router: change admin password, Wi-Fi settings (RSA) + Wi-Fi QR. SMS/USSD dropped.
-4. **Phase 3**: band lock, APN, notifications, widget, languages, factory reset.
+3. **Phase 2 (Router tab first)**: Built and still to be run on the router or checked on the phone: change admin password, Wi-Fi settings + QR, device management + blocking, guest Wi-Fi, automatic restart, LTE band lock, antenna positioning mode, app lock. Done: speed chart, monthly usage, Router tab. Not started: data plan (owner doesn't need it for now), feature-flag hiding. Network mode is not applicable (this router is 4G only). **SMS/USSD dropped** (owner's choice, 2026-09-29).
+4. **Phase 3**: APN, notifications, widget, languages, factory reset.
 
 ## Release
 

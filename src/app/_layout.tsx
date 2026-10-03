@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { useSessionWatcher } from '@/hooks/router';
+import { AppLockProvider } from '@/state/AppLockProvider';
 import { AuthProvider } from '@/state/AuthProvider';
 import { SnackbarProvider } from '@/state/SnackbarProvider';
 import { queryClient } from '@/state/queryClient';
@@ -24,6 +25,9 @@ function AppStack() {
       <Stack.Screen name="change-password" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="wifi" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="device/[mac]" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="antenna" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="guest-wifi" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="lte-band" options={{ animation: 'slide_from_right' }} />
     </Stack>
   );
 }
@@ -34,8 +38,10 @@ export default function RootLayout() {
       <QueryClientProvider client={queryClient}>
         <SnackbarProvider>
           <AuthProvider>
-            <StatusBar style="dark" />
-            <AppStack />
+            <AppLockProvider>
+              <StatusBar style="dark" />
+              <AppStack />
+            </AppLockProvider>
           </AuthProvider>
         </SnackbarProvider>
       </QueryClientProvider>
