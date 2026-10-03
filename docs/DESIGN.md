@@ -379,6 +379,8 @@ After reboot: full-screen waiting screen ("Rebooting your router…", spinner). 
 - Charts (Phase 2): one lightweight SVG line (`react-native-svg`), no chart library with heavy animations.
 - Keep a dark theme possible later by reading colors from the theme object, but **ship light only** for now.
 - In Expo Go a grey gear button floats at the top right: that's Expo's developer menu, not part of the app.
+- **Never change a screen's state once it has started to leave** (after `router.back()` / `replace()`): re-rendering a form during its exit transition crashed release builds (AGENTS.md §12a). Reset `busy` and similar state only on the paths where the screen stays open.
+- New screens are checked in Expo Go for layout, and in a standalone APK for behaviour: release builds run faster JavaScript and have shown a crash Expo Go never did.
 
 ## 16. App icon
 
@@ -390,7 +392,7 @@ After reboot: full-screen waiting screen ("Rebooting your router…", spinner). 
   - `android-icon-monochrome.png`: white glyph for Android themed icons
   - `icon.png`: full-square icon, larger glyph
   - `splash-icon.png`, `favicon.png`
-- To change the icon, edit the script (colors come from DESIGN.md) and re-run it. The icon only appears in a standalone build; Expo Go shows its own icon.
+- To change the icon, edit the script (colors come from DESIGN.md) and re-run it. The icon appears in the standalone app; Expo Go shows its own icon. The same script writes `docs/images/app-icon.png`, a rounded-corner copy for the README.
 
 ## 17. Implementation status
 
@@ -405,4 +407,4 @@ After reboot: full-screen waiting screen ("Rebooting your router…", spinner). 
 | Login (9.6) | ✅ Built, screenshot-blocked |
 | States (10) | ✅ Built except "stale data" line |
 | Dangerous actions (11) | 🔨 Reboot, mobile data off, Wi-Fi change, guest Wi-Fi change, 4G band change, admin password change, block device built; factory reset later |
-| App icon (16) | ✅ Generated; visible after standalone build |
+| App icon (16) | ✅ Generated; shown by the standalone app |

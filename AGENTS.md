@@ -18,13 +18,13 @@ If these documents conflict, **security rules in this file win**, then FEATURES.
 
 `CLAUDE.md` only contains `@AGENTS.md`, so Claude Code loads this file automatically.
 
-### Current status (2026-10-02)
+### Current status (2026-10-03)
 
-- **Phase 1 is built** and runs on the phone through Expo Go. The user has logged in successfully with the real router; dashboard, signal and devices (Wi-Fi + cable) are verified on the phone.
-- **Phase 2 so far:** Router tab (status card, mobile data, reboot), monthly usage on Home, speed chart are done. **Built but not yet run on the router:** change admin password, Wi-Fi name/password/hide, reveal Wi-Fi password, Wi-Fi QR code. **Built, not yet checked on the phone:** Devices tab groups (new / connected / not connected), device detail (name, type, maker), antenna mode, app lock. **Built, POST not yet run on the router:** guest Wi-Fi, automatic restart switch, LTE band lock.
-- **Device blocking (FEATURES 8.4) is built, its POST not yet run on the router.** The format was read from the router's `devicemanagement.js` on 2026-10-03 (see §6). Running it for real needs the user's approval (§9).
-- **Not yet exercised on the phone:** logout, remember password, session expiry, mobile data switching, reboot, "Trust new router", and the Phase 2 items above.
-- **No standalone APK yet.** The app icon is generated in `assets/`. The build route (EAS cloud vs local Android SDK) is **the user's decision**; don't start either without asking (§9).
+- **Phase 1 is built.** Login, dashboard, signal and devices (Wi-Fi + cable) are verified on the phone with the real router.
+- **Phase 2 is built** (see §10 for the list): Router tab, Wi-Fi settings, admin password change, device management with blocking, guest Wi-Fi, LTE band lock, automatic restart, antenna mode, app lock. **None of the requests that change the router has been run on the router yet**, and the newer screens have not been looked at on the phone. Expect fixes on first contact.
+- **Router research method:** formats are copied from the router's own page scripts, read in a logged-in read-only session (see §9 "Login against the real router").
+- **Not yet exercised on the phone:** logout, remember password, session expiry, mobile data switching, reboot, "Trust new router", and every Phase 2 action.
+- **Standalone APK: version 1.0.4 (versionCode 5) is installed on the phone**, built locally. Earlier versions 1.0.2 and 1.0.3 were EAS cloud builds. The release-only crash right after login (fixed in 1.0.3, see §12a) is **not yet confirmed fixed** by the user.
 - **Next:** test the built features on the router and phone (each router change needs the user's go-ahead, §9). The Messages tab was replaced by a Router tab; SMS/USSD are dropped; the data plan feature is not wanted for now.
 - Full per-feature status is in FEATURES.md; per-screen status in DESIGN.md §17.
 
@@ -33,11 +33,11 @@ If these documents conflict, **security rules in this file win**, then FEATURES.
 | Item | Value |
 |---|---|
 | OS / shell | Windows 11, PowerShell (Git Bash also available) |
-| Node / npm / Java | 26.5 / 11.17 / 21 |
+| Node / npm / Java | 26.5 / 11.17 / JDK 17 (Microsoft OpenJDK, `JAVA_HOME` set; needed for the Android build) |
 | App stack | Expo SDK 57, React Native 0.86, React 19.2, TypeScript 6, Jest 29 (`jest-expo`) |
-| Android SDK | **Not installed** (user declined a local install for now). Develop with Expo Go. A partial download may remain at `%LOCALAPPDATA%\Android\Sdk` (`cmdtools.zip`, empty `cmdline-tools/`). |
-| Test phone | Samsung SM-A065F, Android 16, ≈ 384 × 853 dp, 3-button nav, adb serial from `adb devices` (use it as `<serial>` below), **Expo Go 57** (must match the SDK) |
-| Network | Router `192.168.8.1` · laptop `192.168.8.102` (Ethernet) · phone `192.168.8.100` (Wi-Fi) |
+| Android SDK | **Installed** (2026-10-03, command-line tools only, no Android Studio) at `%LOCALAPPDATA%\Android\Sdk`, `ANDROID_HOME` set: platform 36, build-tools 36.0.0 (+ 35.0.0, pulled in by Gradle), NDK 27.1.12297006, CMake 3.22.1, platform-tools. **`cmake\3.22.1\bin\ninja.exe` was replaced with ninja 1.12.1** (the bundled 1.10 fails with "Filename longer than 260 characters"; the old one is kept as `ninja-old.exe`). Windows long paths are enabled. `%USERPROFILE%\.gradle\gradle.properties` sets `org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g`. |
+| Test phone | Samsung SM-A065F, Android 16, ≈ 384 × 853 dp, 3-button nav, **Expo Go 57** (must match the SDK). Connected over **wireless debugging**: `adb devices` shows it by an mDNS name (use that as `<serial>` below); the port changes whenever wireless debugging restarts. |
+| Network | Router `192.168.8.1` · laptop on Ethernet · phone on Wi-Fi. The laptop's and phone's addresses change (DHCP); don't rely on them. |
 | Router | B312-926, operator HUTCH, `password_type=4`, `encrypt_enabled=1` (RSA), `firstlogin=1` |
 
 ## 3. Commands
@@ -53,7 +53,7 @@ python scripts/make-icons.py    # regenerate app icons in assets/
 python scripts/make-oui.py      # regenerate src/utils/ouiData.ts (device makers) from the IEEE registry
 ```
 
-**Run on the phone (USB, known-good setup):**
+**Run in Expo Go on the phone (known-good setup, USB or wireless debugging):**
 
 ```bash
 adb -s <serial> reverse tcp:8081 tcp:8081
@@ -66,6 +66,29 @@ adb -s <serial> exec-out screencap -p > screen.png                          # ch
 - Do not set `CI=1` for the dev server: it disables reloads.
 - The first bundle takes ~15–20 s; Expo Go may time out on the very first load. Reload or relaunch.
 - Screenshots of the login screen are black: that is the screenshot blocking working.
+
+**Build an APK locally (Windows, known-good setup):**
+
+```powershell
+cd android
+.\gradlew.bat assembleRelease -PreactNativeArchitectures=arm64-v8a      # APK: android\app\build\outputs\apk\release\app-release.apk
+adb -s <serial> install -r app\build\outputs\apk\release\app-release.apk
+```
+
+- After changing `app.json` (version, permissions) or a plugin, run `npx expo prebuild --platform android` in the project root first. Add `--clean` only when `android/` is broken: it forces a full native rebuild.
+- `-PreactNativeArchitectures=arm64-v8a` builds the native code for the phone's processor only (a quarter of the time, smaller APK). Leave it out for an APK that runs on every device type.
+- First build: about an hour on this laptop (downloads + native compile for four processor types). Later builds: about 10–15 minutes.
+- **One Gradle build at a time.** A second run (another terminal, or VS Code's Java/Gradle extension importing `android/`) cancels or slows the first. A build started from an agent session dies if that session restarts: prefer letting the user run it in their own terminal.
+- `android/` is generated and ignored by git. Never edit it by hand.
+
+**Build in the cloud (EAS, needs the user's go-ahead each time, §9):**
+
+```bash
+npx eas-cli@latest build --platform android --profile preview --non-interactive --no-wait
+npx eas-cli@latest build:view <build id> --json      # status + applicationArchiveUrl
+```
+
+- Cloud and local builds are signed with **different keys**, so one can't be installed over the other (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`): uninstall first, which wipes the app's saved data on the phone.
 
 Before saying a task is done: `tsc`, `lint` and `test` pass, and the change was checked on the phone for UI work.
 
@@ -306,7 +329,7 @@ Layer rule: `src/app/` → `hooks/` + `state/` → `api/` + `security/`. Screens
 This app controls a **real, in-use router**. The laptop and phone depend on it for internet.
 
 - **Allowed without asking:** read-only `GET` probes of the router API to verify endpoints; running the app in Expo Go on the phone; `adb` read-only commands (`getprop`, `wm size`, logcat, `screencap`); `adb shell input tap` to navigate **between tabs/screens** in our app (not to trigger actions).
-- **Login against the real router:** preferred: **ask the user to log in on the phone themselves** (this is how Phase 1 was verified). Agents must not type the password with `adb shell input text` or put it in any command line. If an agent must log in, unit-test the hash first, then **one** attempt per task with a password the user gives in the current conversation, never written to disk, env files, shell history or scripts. On failure, stop and report.
+- **Login against the real router:** preferred: **ask the user to log in on the phone themselves** (this is how Phase 1 was verified). For reading the router's page scripts and settings, the method used on 2026-10-03: a small script opens its own console window where **the user types the password** (hidden); it logs in once, only sends `GET` requests for paths the agent asks for, and logs out. The password never appears in a command, file or log. Delete the fetched files afterwards (they hold device names and MACs), and don't search the router's `config/*.xml` files. Agents must not type the password with `adb shell input text` or put it in any command line. If an agent must log in, unit-test the hash first, then **one** attempt per task with a password the user gives in the current conversation, never written to disk, env files, shell history or scripts. On failure, stop and report.
 - **Ask before any large download or system-level install** (Android SDK/NDK, emulators, global tools), even if it is the obvious route to the user's goal. Explain the options and let the user choose. Project-level `npx expo install` / `npm install` of app dependencies is fine.
 - **Ask before publishing or building in the cloud** (EAS Build/Submit/Update), since it needs the user's Expo account.
 - **Never, without explicit user approval in the current conversation:** reboot, factory reset, power off, mobile data off, Wi-Fi off, SSID/password change, network mode/band/APN change, MAC block, sending SMS/USSD, deleting SMS, clearing statistics, changing the admin password, `adb install/uninstall` of other apps, changing phone settings.
@@ -317,7 +340,7 @@ This app controls a **real, in-use router**. The laptop and phone depend on it f
 ## 10. Build phases (from FEATURES.md)
 
 1. **Phase 1 (MVP): built.** Project setup, theme tokens, security modules (§8.2–8.6), router detection, no-login dashboard, login/session, signal, devices (Wi-Fi + cable), mobile data toggle, reboot, app icon. Remaining: phone tests of logout, mobile data switch, reboot, remember password (each needs the user's go-ahead, §9).
-2. **Release (pending user decision):** standalone APK with the icon via EAS Build or a local Android SDK build. Release signing: keystore **outside the repo**, wired with a config plugin (never hand-edit `android/`).
+2. **Release: done both ways.** EAS cloud builds (`preview` profile, 1.0.2 and 1.0.3, signed with the key Expo holds) and local builds with the Android SDK (1.0.4, signed with the debug key from the template). Still open: one release keystore kept **outside the repo** and wired with a config plugin (never hand-edit `android/`), so local and cloud builds update each other.
 3. **Phase 2 (Router tab first):** Built and still to be run on the router or checked on the phone: change admin password, Wi-Fi settings + QR, device management + blocking, guest Wi-Fi, automatic restart, LTE band lock, antenna positioning mode, app lock. Done: speed chart, monthly usage, Router tab. Not started: data plan (owner doesn't need it for now), feature-flag hiding. Network mode is not applicable (this router is 4G only). **SMS/USSD dropped** (owner's choice, 2026-09-29).
 4. **Phase 3:** APN, notifications, widget, languages, factory reset.
 
@@ -347,7 +370,13 @@ Security modules are built **first**, not added later.
 - **Open decisions (security review 2026-09-29):** saved password is not wiped on manual logout or on `108007` (§8.2/§8.3 say it should — owner to decide); login and change-password screens keep the typed password in screen state until the screen closes (§8.2 says no React state).
 - **`npm audit`:** 13 moderate. 12 are Expo build tooling (`@expo/config-plugins` → `xcode` → `uuid`), not shipped. **One ships in the app:** `expo-router` → `query-string` → `decode-uri-component` (GHSA-vcc3-ghjq-m6fr, DoS on a crafted percent-encoded link). Low risk (a malicious `rapp://` link could freeze the app). Update Expo patch releases (`npx expo install --check`) and re-audit before release; don't run `npm audit fix --force`.
 - **Signal is poor** at the router's current spot (RSRP ≈ −105 dBm), which makes antenna positioning mode (FEATURES 3.4) high-value.
-- The admin password was shared in plain text early in the project; remind the user to change it (FEATURES 1.9 will make that possible in-app).
+- **Release-only crash right after login (fixed in 1.0.3, unconfirmed):** `addViewAt: failed to insert view … already has a parent`. After a successful login the screen started its exit transition and then reset `busy`, so Fabric re-parented views that react-native-screens still held. Rule that came out of it: **once a screen starts leaving, don't change its state** (`login.tsx`, `change-password.tsx`). It never showed in Expo Go (slower dev JavaScript). Crash logs: `adb logcat -b crash -d`.
+- **Local builds use the debug signing key.** The template's debug keystore is the same after every prebuild, so local builds update each other, but an EAS build and a local build can't. Saved device names live in the app's data and are lost on uninstall.
+- **`expo-system-ui` is not installed**, so `userInterfaceStyle: "light"` is not applied at the Android system level (prebuild warns about it). The app's own screens are light anyway; native parts (dialogs, keyboard) may follow the phone's dark mode.
+- **Jest can't load `@expo/vector-icons`** (`expo-asset` is not resolvable from `expo-font` under Jest). Keep logic that needs tests in modules without UI imports (e.g. `state/appLock.ts` next to `AppLockProvider.tsx`).
+- **Typed routes:** `.expo/types/router.d.ts` is only regenerated by the dev server, so new routes are pushed with `as Href` until it next runs.
+- **Polling off-screen:** `useRouterInfo`, `useSimReady` and `useMobileData` keep refreshing on every tab (they only pause in the background), against §6.
+- **The admin password has been shared in plain text in chat more than once** (last on 2026-10-03). Remind the user to change it; the app can do it (Router → Security), which would also be the first real test of that feature.
 
 ## 13. Git
 

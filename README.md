@@ -100,15 +100,20 @@ The build takes about 10–20 minutes and ends with a download link for the `.ap
 
 ### On your own computer
 
-Needs JDK 17 and the Android SDK (Platform 36, Build-Tools 36, NDK 27.1.12297006, CMake), installed most easily with Android Studio.
+Needs JDK 17 and the Android SDK (Platform 36, Build-Tools 36, NDK 27.1.12297006, CMake 3.22.1), from Android Studio or the command-line tools (`sdkmanager`).
 
 ```bash
-npx expo prebuild --platform android --clean
+npx expo prebuild --platform android
 cd android
 ./gradlew assembleRelease      # Windows: .\gradlew.bat assembleRelease
 ```
 
+Add `-PreactNativeArchitectures=arm64-v8a` to build only for 64-bit ARM phones: much faster and a smaller APK.
+
 The APK is written to `android/app/build/outputs/apk/release/app-release.apk`. The generated `android/` folder isn't committed: rerun `prebuild` after config changes instead of editing it.
+
+> [!TIP]
+> **Windows:** the build fails with `Filename longer than 260 characters` unless long paths are enabled (`LongPathsEnabled` in the registry, plus `git config --global core.longpaths true`) **and** the `ninja.exe` in the SDK's `cmake\3.22.1\bin` folder is replaced with ninja 1.12 or newer. The first build takes a long time; later ones are quick.
 
 > [!IMPORTANT]
 > Local builds are signed with a different key from cloud builds, so one can't be installed over the other without uninstalling first. Keep any release keystore **outside** the repository.

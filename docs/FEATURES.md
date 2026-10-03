@@ -9,21 +9,21 @@ A React Native (Expo) app for managing a Huawei B312-926 (HUAWEI 4G Router 2s) f
 | Router | Huawei B312-926, HiLink API at `http://192.168.8.1/api/` |
 | SIM / network | HUTCH (41308), 4G LTE, band B1 |
 | Wi-Fi SSID | (owner's network; not stored in the repo) |
-| Phone | Samsung SM-A065F, Android 16 (SDK 36), arm64, **Expo Go 57** installed |
-| Laptop | `192.168.8.102` (Ethernet), Node 26.5, npm 11.17, Java 21, **no Android SDK** |
+| Phone | Samsung SM-A065F, Android 16 (SDK 36), arm64, **Expo Go 57** and the standalone **R App 1.0.4** installed; connected over wireless debugging |
+| Laptop | Ethernet, Node 26.5, npm 11.17, JDK 17, **Android SDK installed** (command-line tools, NDK 27.1, CMake 3.22.1 with ninja 1.12.1; see [AGENTS.md](../AGENTS.md) §2) |
 | App stack | Expo SDK 57, React Native 0.86, React 19.2, TypeScript 6 |
 | Login | `password_type=4` (SHA-256), RSA encryption enabled, `firstlogin=1` |
 
 ## Progress
 
-**Phase 1: done except device testing of risky actions.** The app runs on the phone through Expo Go and has been used with a real login. It is **not yet built as a standalone APK** (see [Release](#release)).
+**Phase 1 is done and Phase 2 is built, but almost nothing that changes the router has been tested on it.** The app runs on the phone as a standalone APK (1.0.4, local build) and in Expo Go. Reading data (dashboard, signal, devices) is verified with the real router; the actions listed under "Built, not yet exercised" are not. See [Release](#release).
 
 | Area | Status |
 |---|---|
 | Verified on the phone | Router detection, login, no-login dashboard, logged-in dashboard, signal details, connected devices (Wi-Fi + cable), "this phone" label, feature flags, pull-to-refresh, "can't reach router" screen, screenshot blocking on login |
-| Built, not yet exercised | Logout, remember password, session expiry / idle logout, mobile data **switching**, reboot + waiting screen, "Trust new router" flow; Phase 2: change admin password, Wi-Fi name/password/hide, show Wi-Fi password, Wi-Fi QR |
+| Built, not yet exercised | Phase 1: logout, remember password, session expiry / idle logout, mobile data **switching**, reboot + waiting screen, "Trust new router" flow. Phase 2: change admin password, Wi-Fi name/password/hide, show Wi-Fi password, Wi-Fi QR, device names / known-new / maker / detail screen, block and unblock, guest Wi-Fi, LTE band lock, automatic restart switch, antenna mode, app lock |
 | Security built | Router fingerprint pinning, encrypted password storage (opt-in), login attempt limiter, idle/background logout, screenshot blocking, device re-auth for risky actions, cleartext only to the router, log redaction |
-| App icon | Designed and generated (`assets/`); visible only after a standalone build |
+| App icon | Designed and generated (`assets/`); shown by the standalone app |
 | Tests | 200 unit tests passing; type check + lint clean |
 
 ## Legend
@@ -153,7 +153,7 @@ Removed on 2026-09-29 (owner's choice): the owner doesn't need SMS or USSD in th
 | 11.7 | Android home-screen widget (signal + data used) | P3 | ⬜ |
 | 11.8 | Sinhala / Tamil language support | P3 | ⬜ |
 | 11.9 | Snackbar messages (errors, "session ended") | P1 | ✅ |
-| 11.10 | App icon (router + Wi-Fi, light blue) | P1 | ✅ generated, needs standalone build to show |
+| 11.10 | App icon (router + Wi-Fi, light blue) | P1 | ✅ |
 
 ## 12. Security features
 
@@ -164,7 +164,7 @@ Removed on 2026-09-29 (owner's choice): the owner doesn't need SMS or USSD in th
 | 12.3 | Idle logout (10 min) and background logout (5 min) | P1 | 🔨 |
 | 12.4 | Screenshot / recents blocking on sensitive screens | P1 | ✅ login screen · 🔨 Wi-Fi, change admin password |
 | 12.5 | Device re-auth (fingerprint/PIN) for risky actions; blocked if the phone has no screen lock | P1 | 🔨 reboot, "Trust new router", Wi-Fi change, show Wi-Fi password / QR, admin password change |
-| 12.6 | Cleartext HTTP allowed only to the router in release builds (config plugin) | P1 | 🔨 (applies to standalone builds) |
+| 12.6 | Cleartext HTTP allowed only to the router in release builds (config plugin) | P1 | 🔨 the release APK reaches the router; that other hosts are refused has not been tested |
 | 12.7 | Log redaction + `console` stripped from release builds | P1 | ✅ |
 | 12.8 | App lock on open and after 1 minute away (optional, fingerprint/PIN; Settings → Security) | P2 | 🔨 |
 | 12.9 | Clipboard auto-clear after copying the Wi-Fi password | P2 | ⬜ |
@@ -198,15 +198,15 @@ Guest Wi-Fi     → 9.5 (screenshot-blocked)                                    
 
 1. **Phase 1 (MVP)**: ✅ project setup, router detection, no-login dashboard, login + token handling, signal, devices (Wi-Fi + cable), data toggle, reboot, security modules, app icon.
    - Remaining: test on the phone the logout, mobile data switch, reboot and remember-password flows.
-2. **Release (pending decision)**: standalone APK with the icon. Choose EAS cloud build (needs a free Expo account) or a local build (needs the Android SDK, ~4–5 GB). See [Release](#release).
+2. **Release**: ✅ standalone APKs built both ways: EAS cloud (1.0.2, 1.0.3) and locally with the Android SDK (1.0.4, on the phone). Open: one release signing key outside the repo. See [Release](#release).
 3. **Phase 2 (Router tab first)**: Built and still to be run on the router or checked on the phone: change admin password, Wi-Fi settings + QR, device management + blocking, guest Wi-Fi, automatic restart, LTE band lock, antenna positioning mode, app lock. Done: speed chart, monthly usage, Router tab. Not started: data plan (owner doesn't need it for now), feature-flag hiding. Network mode is not applicable (this router is 4G only). **SMS/USSD dropped** (owner's choice, 2026-09-29).
 4. **Phase 3**: APN, notifications, widget, languages, factory reset.
 
 ## Release
 
-- Not built yet. Development uses Expo Go on the phone over USB (see [AGENTS.md](../AGENTS.md) §3).
-- Options: **EAS Build** (cloud; no local SDK; needs the user's Expo account login) or **local build** (install Android SDK + NDK, then `npx expo prebuild` and Gradle). Ask the user before either.
-- Release signing needs a keystore kept **outside** the repo, wired in with a config plugin (not by editing `android/`).
+- **Current build: 1.0.4 (versionCode 5), built locally and installed on the phone.** Earlier: 1.0.2 and 1.0.3 as EAS cloud builds (1.0.3 fixed a release-only crash right after login; the fix is not yet confirmed by the owner).
+- Two routes, both working: **EAS Build** (cloud, `preview` profile, needs the owner's Expo account and go-ahead) and **local build** (`npx expo prebuild --platform android`, then `gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a`). Commands and Windows pitfalls (long paths, ninja 1.12.1, one Gradle build at a time) are in [AGENTS.md](../AGENTS.md) §3.
+- Signing: EAS builds use the key Expo holds; local builds use the template's debug key, so the two can't update each other (uninstall first, which wipes saved device names). A single release keystore kept **outside** the repo, wired in with a config plugin (not by editing `android/`), is still to do.
 - Icons are generated by `python scripts/make-icons.py` into `assets/`.
 
 ## Tech stack
@@ -226,7 +226,7 @@ Guest Wi-Fi     → 9.5 (screenshot-blocked)                                    
 | Cleartext HTTP (release) | `plugins/withRouterNetworkSecurity.js` → network security config for `192.168.8.1` only |
 | Icons | `@expo/vector-icons` (Ionicons) |
 | Tests | Jest (`jest-expo`) |
-| Dev testing | Expo Go on the phone via USB (`adb reverse`) |
+| Dev testing | Expo Go on the phone (`adb reverse`, USB or wireless debugging); release behaviour only in a standalone APK |
 
 ## Technical notes & risks
 
@@ -241,5 +241,6 @@ Guest Wi-Fi     → 9.5 (screenshot-blocked)                                    
 - **Router public key** is stable between requests; **not verified across reboots/firmware updates**. If it changes, the app shows the "not your router" warning and the user must re-trust.
 - **Dangerous actions** (reboot, factory reset, Wi-Fi off, data off, MAC block of own phone) need confirmation dialogs; most also need fingerprint/PIN.
 - **Security:** never hardcode the admin password; **change the current admin password** because it was shared in plain text. Keep the app LAN-only; use a VPN (e.g. Tailscale/WireGuard) for remote access instead of port forwarding.
+- **Remote use** (from outside the home network) is not built and not planned: the router has no public address and only speaks plain HTTP. If ever needed, use a VPN into the home network (e.g. Tailscale on a device that stays on at home); the app needs no change.
 - `npm audit`: 13 moderate issues. 12 are in Expo build tooling (not shipped); one ships in the app (`expo-router` → `query-string` → `decode-uri-component`, low risk, see AGENTS.md §12a). Recheck before release.
 - Endpoints marked ⏳ are standard HiLink endpoints but may differ or be missing on this firmware. Check each one before building its screen.
