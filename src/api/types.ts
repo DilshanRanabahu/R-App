@@ -79,6 +79,7 @@ export interface HostRaw {
   IpAddress?: string;
   HostName?: string;
   AssociatedTime?: string;
+  Frequency?: string; // wlan/host-list: "2.4GHz" | "5GHz"
 }
 
 export interface HostListRaw {
@@ -90,6 +91,37 @@ export interface LanHostRaw extends HostRaw {
   ActualName?: string;
   InterfaceType?: string; // "Ethernet" | "Wireless" | ...
   Active?: string; // "1" = connected now
+  AddressSource?: string; // "DHCP" | "Static"
+  isLocalDevice?: string; // "1" = the device that is asking (this phone)
+}
+
+/** One SSID's block or allow list: WifiMacFilterMac0..n + wifihostname0..n. */
+export type MacFilterListRaw = Record<string, string | undefined>;
+
+export interface MacFilterSsidRaw {
+  Index?: string;
+  wifimacblacklist?: MacFilterListRaw | '';
+  wifimacwhitelist?: MacFilterListRaw | '';
+}
+
+/** wlan/multi-macfilter-settings-ex */
+export interface MacFilterExRaw {
+  enable?: string; // "1" = the filter is on
+  wifimacfilterstatus?: string; // 1 = allow list, 2 = block list
+  Ssids?: { Ssid?: MacFilterSsidRaw | MacFilterSsidRaw[] } | '';
+}
+
+export interface BlockedDevice {
+  mac: string;
+  name: string;
+}
+
+export interface BlockList {
+  /** off = filter disabled (the list is kept but not enforced); allow = allow-list mode. */
+  mode: 'off' | 'block' | 'allow';
+  blocked: BlockedDevice[];
+  /** How many devices the router can hold in the list. */
+  max: number;
 }
 
 export interface LanHostInfoRaw {
@@ -207,6 +239,14 @@ export interface Host {
   name: string;
   connectedSeconds: number;
   connection: HostConnection;
+  /** Connected right now. The router also remembers devices that have left. */
+  active: boolean;
+  /** The router says this is the device making the request, i.e. this phone. */
+  self?: boolean;
+  /** Wi-Fi band, e.g. "2.4 GHz" (Wi-Fi devices only). */
+  band?: string;
+  /** How it got its IP address: automatically (DHCP) or set by hand on the device. */
+  addressSource?: 'automatic' | 'fixed';
 }
 
 /** The main (non-guest) Wi-Fi network. */

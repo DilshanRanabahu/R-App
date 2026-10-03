@@ -15,6 +15,10 @@ interface ListRowProps {
   destructive?: boolean;
   divider?: boolean;
   accessibilityHint?: string;
+  /** Show the chevron even when `right` is set (a tappable row with a chip). */
+  chevron?: boolean;
+  /** Greyed icon and title, e.g. a device that isn't connected. */
+  muted?: boolean;
 }
 
 export function ListRow({
@@ -27,12 +31,15 @@ export function ListRow({
   destructive,
   divider,
   accessibilityHint,
+  chevron,
+  muted,
 }: ListRowProps) {
-  const titleColor = destructive ? colors.danger : colors.textPrimary;
+  const titleColor = destructive ? colors.danger : muted ? colors.textSecondary : colors.textPrimary;
+  const iconColor = destructive ? colors.danger : muted ? colors.textMuted : colors.textSecondary;
   const body = (
     <>
       {icon && (
-        <Ionicons name={icon} size={sizes.icon} color={destructive ? colors.danger : colors.textSecondary} />
+        <Ionicons name={icon} size={sizes.icon} color={iconColor} />
       )}
       <View style={styles.text}>
         <AppText variant="body" color={titleColor} numberOfLines={1}>
@@ -50,7 +57,7 @@ export function ListRow({
         </AppText>
       ) : null}
       {right}
-      {onPress && !right && !destructive && (
+      {onPress && (!right || chevron) && !destructive && (
         <Ionicons name="chevron-forward" size={sizes.iconSmall} color={colors.textMuted} />
       )}
     </>

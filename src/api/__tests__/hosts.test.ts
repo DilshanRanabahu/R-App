@@ -21,11 +21,30 @@ function respond(wifi: object[], lan: object[] | Error) {
 describe('getHosts', () => {
   it('includes cable devices from lan/HostInfo, merged by MAC', async () => {
     respond([wifiPhone], [lanPhone, lanLaptop, lanGone]);
-    const hosts = await getHosts();
+    const hosts = (await getHosts()).filter((h) => h.active);
     expect(hosts.map((h) => [h.name, h.connection])).toEqual([
       ['phone', 'wifi'],
       ['laptop', 'cable'],
     ]);
+  });
+
+  it('keeps devices that have left, marked as not active', async () => {
+    respond([wifiPhone], [lanPhone, lanGone]);
+    const gone = (await getHosts()).find((h) => h.name === 'old');
+    // Not in the Wi-Fi list any more, but that doesn't make it a cable device.
+    expect(gone).toMatchObject({ active: false, connection: 'unknown', mac: 'AA:AA:AA:AA:AA:03' });
+  });
+
+  it('reads the Wi-Fi band, address type and the router\'s "this is you" mark', async () => {
+    respond(
+      [{ ...wifiPhone, Frequency: '2.4GHz' }],
+      [{ ...lanPhone, AddressSource: 'DHCP', isLocalDevice: '1' }, { ...lanLaptop, AddressSource: 'Static', isLocalDevice: '0' }],
+    );
+    const [phone, laptop] = await getHosts();
+    expect(phone).toMatchObject({ band: '2.4 GHz', addressSource: 'automatic', self: true });
+    expect(laptop).toMatchObject({ addressSource: 'fixed' });
+    expect(laptop?.self).toBeUndefined();
+    expect(laptop?.band).toBeUndefined();
   });
 
   it('treats unknown-type LAN-only devices as cable', async () => {

@@ -67,6 +67,16 @@ export function validateMac(mac: string): Validation {
   return /^([0-9A-F]{2}:){5}[0-9A-F]{2}$/.test(normalizeMac(mac)) ? null : 'Invalid MAC address.';
 }
 
+export const NICKNAME_MAX_LENGTH = 32;
+
+/** Device nickname (app-side only, never sent to the router). Pass it trimmed. */
+export function validateNickname(name: string): Validation {
+  if (name.length === 0) return 'Enter a name.';
+  if (name.length > NICKNAME_MAX_LENGTH) return `Name must be ${NICKNAME_MAX_LENGTH} characters or less.`;
+  if (/[\u0000-\u001F\u007F]/.test(name)) return "Name can't contain line breaks or control characters.";
+  return null;
+}
+
 /**
  * New admin password (AGENTS.md §8.2 + the router's own rules: 8+ characters,
  * keyboard characters 32–126 only, must not start with a space).

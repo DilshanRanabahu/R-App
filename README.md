@@ -34,13 +34,13 @@ It is built and tested for the **Huawei B312-926** (HUAWEI 4G Router 2s). Other 
 |---|---|---|
 | 🏠 | **Home**: online status, operator and network type, live download/upload speed with a 60-second chart, session and lifetime data, today's and this month's usage with plan progress | No |
 | 📶 | **Signal**: RSRP, SINR, RSRQ, RSSI with a plain-English rating (Excellent → Poor), band, PCI and cell ID | Yes |
-| 📱 | **Devices**: everything connected over Wi-Fi *and* cable, with "This phone" marked | Yes |
+| 📱 | **Devices**: everything connected over Wi-Fi *and* cable, new devices flagged, your own names and icons, device maker, devices seen earlier, and blocking a device from the Wi-Fi | Yes |
 | 🛜 | **Wi-Fi**: change name and password, hide the network, show the password, share a QR code for guests | Yes |
 | 🌐 | **Mobile data**: turn the SIM's internet on or off | Yes |
 | 🔐 | **Admin password**: change the router's login password | Yes |
 | 🔄 | **Reboot**: with a waiting screen that tells you when the router is back | Yes |
 
-Coming next: data plan settings, automatic reboot, device details with blocking, network mode (4G/3G), and an antenna positioning mode that beeps as the signal improves. See [docs/FEATURES.md](docs/FEATURES.md) for the full list and status.
+Coming next: data plan settings, automatic reboot, network mode (4G/3G), and an antenna positioning mode that beeps as the signal improves. See [docs/FEATURES.md](docs/FEATURES.md) for the full list and status.
 
 ## Security
 
@@ -49,7 +49,7 @@ The admin password controls the whole router, and HiLink only speaks plain HTTP,
 - **The password is never stored by default.** "Remember password" is opt-in and kept in Android's encrypted store, unlocked with your fingerprint or PIN.
 - **Only a hash is sent at login**, never the password itself. New passwords (admin and Wi-Fi) are RSA-encrypted with the router's key, the same way its own web page does it.
 - **Router pinning.** The app remembers your router's fingerprint and refuses to send anything to a router that doesn't match ("This doesn't look like your router").
-- **Fingerprint or PIN** before every risky action: reboot, Wi-Fi changes, showing the Wi-Fi password, changing the admin password.
+- **Fingerprint or PIN** before every risky action: reboot, Wi-Fi changes, showing the Wi-Fi password, changing the admin password, blocking a device.
 - **No screenshots** of the login, Wi-Fi and password screens.
 - **Automatic logout** after 10 minutes idle or 5 minutes in the background. At most 3 login attempts per 5 minutes, so the router's lockout is never triggered.
 - **LAN only.** In release builds, plain HTTP is allowed to the router's address and nowhere else. No analytics, ads or third-party network calls; minimal Android permissions; app backups are off.

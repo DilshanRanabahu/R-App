@@ -205,22 +205,47 @@ Wireframes are at 384 dp width.
 
 ```
 ┌──────────────────────────────────────┐
-│ Devices                     2 online │
+│ Devices                     3 online │
+│ 1 new device                         │  group title
 │ ┌──────────────────────────────────┐ │
-│ │ 📱 Galaxy-A06       [This phone] │ │  "This phone" chip, listed first
+│ │ ᯤ Samsung device        [New]  › │ │  "New" chip (warning)
+│ │    192.168.8.103 · Wi-Fi · 4 min │ │
+│ └──────────────────────────────────┘ │
+│ Connected, but not marked as known…  │  caption
+│ [       Mark all as known        ]   │  secondary button
+│ Connected                            │
+│ ┌──────────────────────────────────┐ │
+│ │ 📱 Galaxy-A06    [This phone]  › │ │  listed first
 │ │    192.168.8.100 · Wi-Fi · 1 h 9 min │
 │ ├──────────────────────────────────┤ │
-│ │ 🖥 My-Laptop                      │ │  desktop icon = cable
+│ │ 🖥 My-Laptop                   › │ │  desktop icon = cable
 │ │    192.168.8.102 · Cable · 38 min │ │
 │ └──────────────────────────────────┘ │
-│ Shows Wi-Fi and cable devices. …     │  caption
+│ Not connected                        │
+│ ┌──────────────────────────────────┐ │
+│ │ ▢ Old-Tablet                   › │ │  greyed icon and title
+│ │    Samsung · Not connected       │ │
+│ └──────────────────────────────────┘ │
+│ Tap a device to name it or see …     │  caption
 └──────────────────────────────────────┘
 ```
 
-- Icons: `phone-portrait-outline` for this phone, `desktop-outline` for cable devices, `wifi-outline` for other Wi-Fi devices.
-- Subtitle: IP · connection type (Wi-Fi / Cable) · connected time (omitted when the router doesn't report it).
-- Sort: this phone first, then longest connected.
-- Device detail (Phase 2): nickname (editable), IP, MAC, connected time, **Block device** (danger button, disabled for "this phone" with explanation). Rows get a chevron once details exist.
+- **Four groups** (shared `ListGroup`), each shown only when it has devices: **New** (connected, not marked as known), **Connected** (known; this phone first, then longest connected), **Blocked** (on the router's block list; greyed, red "Blocked" chip, subtitle "Can't use your Wi-Fi"; listed only here), **Not connected** (the router still remembers them; greyed, sorted by name). A device that has left is never listed as new.
+- **Title:** the nickname, else the name the device reports, else "<Maker> device", else "Unknown device".
+- **Icon:** the type the owner picked, else `phone-portrait-outline` for this phone, `desktop-outline` for cable, `wifi-outline` otherwise.
+- **Subtitle:** connected = IP · Wi-Fi / Cable · connected time; not connected = maker · connection · "Not connected".
+- **Chips:** "This phone" (primary), "New" (warning) or "Blocked" (danger). Every row with a MAC opens the detail screen (chevron).
+- **Mark all as known** (secondary button under the New group) → snackbar "3 devices marked as known." This phone is always known.
+- States: logged out → login card; loading → skeletons; failed with nothing to show → "Couldn't load devices" + Retry; no devices at all → "No devices connected".
+
+**Device detail** (sub-screen "Device"):
+
+- **Identity card:** 56 dp icon tile (`primaryBg`, grey when not connected) + name (heading, 2 lines) + maker / reported name (caption); chips: ● Connected / Not connected / Blocked, "This phone", "New".
+- **"Do you recognise this device?"** card (only for new devices): one sentence, **Yes, it's mine** (primary) and **Change Wi-Fi password** (secondary, opens the Wi-Fi screen).
+- **Name and type** card: Name input (placeholder = the reported name, max 32), Type as `ChoiceChips` (Phone, Tablet, Laptop, Computer, TV, Game console, Speaker, Printer, Camera, Other), **Save** (disabled until something changed; saving also marks the device as known), caption "Names and types are kept on this phone only. The router isn't changed."
+- **Details** group: Status ("Connected for 1 h 9 min"), Connection, Wi-Fi band, IP address, IP address type (Automatic / Fixed on the device), MAC address, Maker ("Hidden" for a private address, with a caption explaining it), Name on router.
+- **Forget this device** (secondary) for devices the owner named or marked: removes the name and type and marks it as new again.
+- **Wi-Fi access** card: one sentence + **Block this device** (danger outline) or, when blocked, **Unblock** (secondary); both show "Blocking…" / "Unblocking…" while running. Instead of the button, a plain sentence explains why it isn't offered: this phone ("can't be blocked"), a cable device ("Unplug the cable instead"), an allow-list router, or a block list that couldn't be read. Skeleton while the block list loads. Results as snackbars: "<name> is blocked.", "<name> can use your Wi-Fi again.", "The router's block list is full (10 devices). Unblock one first."
 
 ### 9.4 Router
 
@@ -306,7 +331,7 @@ Every screen and card handles these; design them, don't leave blank screens.
 | Reboot | Dialog: "Reboot router? Internet will be off for about 1–2 minutes." → **Reboot** → fingerprint/PIN |
 | Mobile data off | Dialog: "Turn off mobile data? All devices will lose internet until you turn it back on." (turning on needs no dialog) |
 | Change Wi-Fi name/password | Dialog: "Your phone will disconnect. Reconnect using the new password." |
-| Block device | Dialog with device name |
+| Block device | Dialog "Block <name>? It will be disconnected and can't use your Wi-Fi until you unblock it." → **Block** (red) → fingerprint/PIN. Unblock: "Unblock <name>? It will be able to connect to your Wi-Fi again." → **Unblock** → fingerprint/PIN |
 | Send SMS / USSD | (dropped with the Messages tab) Dialog showing number/code (may cost money) |
 | Factory reset | Two steps: dialog, then type `RESET` to enable the button |
 
@@ -343,7 +368,7 @@ After reboot: full-screen waiting screen ("Rebooting your router…", spinner). 
 - Tokens live in `src/theme/` (`colors.ts`, `typography.ts`, `spacing.ts`); components and screens use only tokens, no raw hex values.
 - `app.json`: `"userInterfaceStyle": "light"`, `backgroundColor #F5F7FA`; `expo-status-bar` with `style="dark"`.
 - `react-native-safe-area-context` for status/nav bar insets; the tab bar height is 64 dp + bottom inset.
-- Components built (`src/components/`): `AppText` (variants, `numeric` = tabular digits, hero numbers capped at 1.3× font scale), `Card`, `StatusChip`, `Button` (primary / secondary / danger / dangerFilled, loading), `ListRow`, `ListGroup` (titled group of rows, used by Router + Settings), `SignalBars`, `SpeedChart` (SVG, monotone curve so it never dips below zero), `ProgressBar`, `Input` (label, error, secret with eye), `ConfirmDialog`, `EmptyState`, `LoginRequired`, `Skeleton`, `Screen` (title header + pull-to-refresh), `SubScreen` (back arrow + title for pushed screens), `QrCode` (one SVG path). Snackbar is in `src/state/SnackbarProvider.tsx`.
+- Components built (`src/components/`): `AppText` (variants, `numeric` = tabular digits, hero numbers capped at 1.3× font scale), `Card`, `StatusChip`, `Button` (primary / secondary / danger / dangerFilled, loading), `ListRow` (`chevron` with a chip, `muted` for greyed rows), `ListGroup` (titled group of rows, used by Router, Settings and Devices), `ChoiceChips` (pick one of a few options, icon + label pills), `SignalBars`, `SpeedChart` (SVG, monotone curve so it never dips below zero), `ProgressBar`, `Input` (label, error, secret with eye), `ConfirmDialog`, `EmptyState`, `LoginRequired`, `Skeleton`, `Screen` (title header + pull-to-refresh), `SubScreen` (back arrow + title for pushed screens), `QrCode` (one SVG path). Snackbar is in `src/state/SnackbarProvider.tsx`.
 - Signal bars use heights 40 / 60 / 80 / 100 % so even one bar reads as a bar.
 - Charts (Phase 2): one lightweight SVG line (`react-native-svg`), no chart library with heavy animations.
 - Keep a dark theme possible later by reading colors from the theme object, but **ship light only** for now.
@@ -368,10 +393,10 @@ After reboot: full-screen waiting screen ("Rebooting your router…", spinner). 
 | Theme tokens, components | ✅ Built |
 | Home (9.1) | ✅ Built incl. speed chart and monthly usage card |
 | Signal (9.2) | ✅ Built; antenna mode in Phase 2 |
-| Devices (9.3) | ✅ Built (Wi-Fi + cable); detail screen in Phase 2 |
+| Devices (9.3) | ✅ List (Wi-Fi + cable) · 🔨 new / connected / blocked / not connected groups, device detail and block / unblock (built, not yet checked on the phone) |
 | Router (9.4) | ✅ Status card, mobile data, reboot · 🔨 Wi-Fi screen, change admin password (built, not yet run on the router); more groups in Phase 2 |
 | Settings (9.5) | ✅ App only (account, router address, version) |
 | Login (9.6) | ✅ Built, screenshot-blocked |
 | States (10) | ✅ Built except "stale data" line |
-| Dangerous actions (11) | 🔨 Reboot, mobile data off, Wi-Fi change, admin password change built; block device and factory reset later |
+| Dangerous actions (11) | 🔨 Reboot, mobile data off, Wi-Fi change, admin password change, block device built; factory reset later |
 | App icon (16) | ✅ Generated; visible after standalone build |

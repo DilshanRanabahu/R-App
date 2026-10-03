@@ -19,6 +19,7 @@ export const radius = {
 export const sizes = {
   touchTarget: 48,
   listRow: 56,
+  chip: 40,
   tabBar: 64,
   icon: 24,
   iconSmall: 20,

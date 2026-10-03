@@ -2,6 +2,7 @@ import {
   isPrivateIPv4,
   normalizeMac,
   validateMac,
+  validateNickname,
   passwordStrength,
   validateNewAdminPassword,
   validatePhoneNumber,
@@ -100,5 +101,20 @@ describe('passwordStrength', () => {
     expect(passwordStrength('abcdefgh')).toBe('weak');
     expect(passwordStrength('abcdefg1')).toBe('medium');
     expect(passwordStrength('Abcdefgh-123')).toBe('strong');
+  });
+});
+
+describe('validateNickname', () => {
+  it('accepts normal names, including non-English ones', () => {
+    expect(validateNickname('Living room TV')).toBeNull();
+    expect(validateNickname('අම්මාගේ ෆෝන් එක')).toBeNull();
+    expect(validateNickname('a'.repeat(32))).toBeNull();
+  });
+
+  it('rejects empty, too long and control characters', () => {
+    expect(validateNickname('')).not.toBeNull();
+    expect(validateNickname('a'.repeat(33))).not.toBeNull();
+    expect(validateNickname('line\nbreak')).not.toBeNull();
+    expect(validateNickname('tab\there')).not.toBeNull();
   });
 });

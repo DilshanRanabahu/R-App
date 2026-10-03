@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
 import { routerClient } from '@/api/client';
+import { getBlockList, setBlocked } from '@/api/endpoints/macfilter';
 import { getWifiNetwork, revealWifiPassword, saveWifiNetwork } from '@/api/endpoints/wifi';
 import { getHosts } from '@/api/endpoints/wlan';
 import { getBasicInformation, getRouterDetails, getSignal, rebootRouter } from '@/api/endpoints/device';
@@ -135,6 +136,29 @@ export function useHosts(focused: boolean) {
     enabled: status === 'logged_in',
     refetchInterval: every(focused, SLOW),
     meta: AUTH_META,
+  });
+}
+
+/** Devices blocked from the Wi-Fi (the router's MAC filter). */
+export function useBlockList(focused: boolean) {
+  const { status } = useAuth();
+  return useQuery({
+    queryKey: ['blockList'],
+    queryFn: getBlockList,
+    enabled: status === 'logged_in',
+    refetchInterval: every(focused, SLOW),
+    meta: AUTH_META,
+  });
+}
+
+export function useSetBlocked() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: setBlocked,
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['blockList'] });
+      void queryClient.invalidateQueries({ queryKey: ['hosts'] });
+    },
   });
 }
 

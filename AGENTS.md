@@ -21,7 +21,8 @@ If these documents conflict, **security rules in this file win**, then FEATURES.
 ### Current status (2026-10-02)
 
 - **Phase 1 is built** and runs on the phone through Expo Go. The user has logged in successfully with the real router; dashboard, signal and devices (Wi-Fi + cable) are verified on the phone.
-- **Phase 2 so far:** Router tab (status card, mobile data, reboot), monthly usage on Home, speed chart are done. **Built but not yet run on the router:** change admin password, Wi-Fi name/password/hide, reveal Wi-Fi password, Wi-Fi QR code.
+- **Phase 2 so far:** Router tab (status card, mobile data, reboot), monthly usage on Home, speed chart are done. **Built but not yet run on the router:** change admin password, Wi-Fi name/password/hide, reveal Wi-Fi password, Wi-Fi QR code. **Built, not yet checked on the phone:** Devices tab groups (new / connected / not connected), device detail (name, type, maker).
+- **Device blocking (FEATURES 8.4) is built, its POST not yet run on the router.** The format was read from the router's `devicemanagement.js` on 2026-10-03 (see §6). Running it for real needs the user's approval (§9).
 - **Not yet exercised on the phone:** logout, remember password, session expiry, mobile data switching, reboot, "Trust new router", and the Phase 2 items above.
 - **No standalone APK yet.** The app icon is generated in `assets/`. The build route (EAS cloud vs local Android SDK) is **the user's decision**; don't start either without asking (§9).
 - **Next:** rest of Phase 2 (data plan, automatic reboot, device detail + MAC block, network mode; see FEATURES.md → Build phases). The Messages tab was replaced by a Router tab; SMS/USSD are dropped.
@@ -49,6 +50,7 @@ npm test                        # unit tests
 npx expo-doctor                 # dependency / config health (should be 21/21)
 npm audit --omit=dev            # dependency vulnerability check
 python scripts/make-icons.py    # regenerate app icons in assets/
+python scripts/make-oui.py      # regenerate src/utils/ouiData.ts (device makers) from the IEEE registry
 ```
 
 **Run on the phone (USB, known-good setup):**
@@ -105,7 +107,8 @@ src/
     (tabs)/devices.tsx
     (tabs)/router.tsx         # router management (status, Wi-Fi, mobile data, security, reboot)
     (tabs)/settings.tsx       # the app only (account, router address, version)
-    # planned: antenna.tsx, device/[mac].tsx
+    device/[mac].tsx          # device detail: name, type, known/new, details
+    # planned: antenna.tsx
   api/
     client.ts                 # session cookie, token rotation, request queue, timeout, RSA bodies
     auth.ts                   # state-login, login, logout, admin password change
@@ -113,7 +116,7 @@ src/
     xml.ts                    # safe build/parse + escaping (XML, web UI, Wi-Fi UI variants)
     validate.ts               # input validators (IP, SSID, Wi-Fi key, MAC, admin password; phone/USSD/SMS kept unused)
     errors.ts                 # HiLink codes → typed errors + user messages
-    endpoints/                # monitoring, device, net, dialup, wlan (hosts), wifi (settings), parse (helpers)
+    endpoints/                # monitoring, device, net, dialup, wlan (hosts), wifi (settings), macfilter (block list), parse (helpers)
     types.ts
     __tests__/  __fixtures__/ # tests; sanitized sample XML only
   security/
@@ -122,11 +125,11 @@ src/
     deviceAuth.ts             # biometric / device PIN re-auth
     redact.ts                 # redaction for logs/errors
     routerIdentity.ts         # router fingerprint pinning (§8.5)
-  state/                      # AuthProvider, SnackbarProvider, queryClient
+  state/                      # AuthProvider, SnackbarProvider, queryClient, devicePrefs (nicknames/known, AsyncStorage)
   hooks/                      # react-query hooks (useTraffic, useSignal, useHosts, ...)
   components/                 # DESIGN.md §7 components
   theme/                      # colors.ts, typography.ts, spacing.ts (DESIGN.md §3–5)
-  utils/                      # formatters, signal rating
+  utils/                      # formatters, signal rating, devices (grouping/titles), vendor + ouiData (maker from MAC)
 plugins/withRouterNetworkSecurity.js   # cleartext only to the router (§8.6)
 ```
 
@@ -144,6 +147,14 @@ Layer rule: `src/app/` → `hooks/` + `state/` → `api/` + `security/`. Screens
   `base64(sha256_hex(username + base64(sha256_hex(password)) + token))`
 - Error codes: `100002` not supported · `100003` login required · `125001–125003` bad token (refresh token, retry **once**, rebuilding token-dependent bodies) · `108001/108002/108006` wrong credentials (never retry) · `108007` too many attempts · `108003` already logged in.
 - **Connected devices:** `wlan/host-list` returns Wi-Fi clients only. `lan/HostInfo` returns all clients (incl. cable, with `InterfaceType`/`Active`). `getHosts()` merges both by MAC; a LAN-only device is treated as "cable". If `lan/HostInfo` is unsupported, fall back to Wi-Fi only.
+- `lan/HostInfo` also gives `AddressSource` (`DHCP` / `Static`), `LeaseTime`, `ID` and `isLocalDevice` (`1` = the device that is asking, used as a second "this phone" check); devices that have left stay listed with `Active=0`. `wlan/host-list` adds `Frequency` (`2.4GHz`).
+- **Block a Wi-Fi device** (copied from the router's `devicemanagement.js` `changeAccess`, emui webui 6):
+  - Read: `GET wlan/multi-macfilter-settings-ex` → `enable` (1 = filter on), `wifimacfilterstatus` (1 = allow list, 2 = block list), `Ssids.Ssid[]` each with `wifimacblacklist` / `wifimacwhitelist` (empty, or `WifiMacFilterMac0..n` + `wifihostname0..n`).
+  - Write: `POST wlan/multi-macfilter-settings` (plain XML, not the `-ex` path) with one `Ssid`: the first SSID's block-list entries, the device in the first empty slot (or its slot cleared to unblock), `WifiMacFilterStatus` (2 to block; unblocking keeps 2, or 0 if the filter was off), `Index` 0. Never auto-retried.
+  - Slots: `wifimaxmacfilternum` from `wlan/wifi-feature-switch`, else 10. A router in allow-list mode is left alone (`allow_list`). With `enable=0` the list is kept but not enforced; the first block turns it on for every device already listed (the confirm dialog says so).
+  - Only Wi-Fi devices (the web page hides the switch for Ethernet). The app refuses this phone.
+  - Also on that page, not built: `POST lan/changedevicename` (`ID`, `ActualName`, max 64 bytes) renames a device on the router; `POST lan/HostInfo` (`ID=0`, `MacAddress`) removes a not-connected device from the list.
+- Without a session cookie every API path answers `125002`; with an anonymous session every path answers `100003`, **even paths that don't exist**. So an endpoint can only be checked from a logged-in session.
 - HiLink returns a single child as an object and several as an array; always normalize with `toArray()`.
 - RSA (`encrypt_enabled=1`): key from `GET /api/webserver/publickey` (2048-bit, e=65537 on this router). Padding from `rsapadingtype` in `state-login` (`1` = OAEP with SHA-1, as on this router; else PKCS#1 v1.5). **Scheme (from the router's web UI `doRSAEncrypt`, emui webui 6):** base64(UTF-8 XML) → blocks of 214 chars (OAEP) / 245 (PKCS#1) → RSA each block → concatenate as hex; POST with `Content-Type: application/x-www-form-urlencoded; charset=UTF-8;enc`. Implemented in `crypto.ts` `rsaEncryptHex` + `client.post(..., { encrypt })`.
 - **Admin password change:** `POST /api/user/password_scram` (not `user/password`) with `<username>admin</username><currentpassword/><newpassword/>`, values escaped like the web UI's `xss()` (`escapeLikeWebUi`: also `/ ( ) '` as numeric refs), body RSA-encrypted. Never auto-retried. Router rules (`web_pwd_simplify_enabled=1`): ≥ 8 chars, ASCII 32–126, no leading space. Errors: `108008` = "Password entered incorrectly too many times" (session ends), `125002` = session ends, anything else = "Password incorrect". After success the router ends the session.
@@ -216,7 +227,8 @@ Layer rule: `src/app/` → `hooks/` + `state/` → `api/` + `security/`. Screens
   - (Phone / USSD / SMS validators exist but are unused since SMS/USSD were dropped; they and the SMS link rule below apply if those features return.)
   - Admin password: 8–32 chars, ASCII 32–126, no leading space, different from the current one.
   - Router address: see §8.5.
-  - MAC: `^([0-9A-F]{2}:){5}[0-9A-F]{2}$` (normalize upper case).
+  - MAC: `^([0-9A-F]{2}:){5}[0-9A-F]{2}$` (normalize upper case). Route parameters carrying a MAC are checked the same way (`paramToMac`).
+  - Device nickname: 1–32 characters, no control characters (app-side only, never sent to the router).
 - Treat **all router data as untrusted** (SMS bodies, device names, SSIDs, USSD replies). Render as plain `<Text>` only. No `WebView`, no `dangerouslySetInnerHTML`, no `eval`/`new Function`.
 - SMS links: do not auto-linkify. If the user taps "Open link", show the full URL in a confirm dialog first (SMS phishing risk).
 - Deep links: the app scheme may only open screens. **No deep link may trigger an action** (reboot, send SMS, change settings).
@@ -244,7 +256,7 @@ Layer rule: `src/app/` → `hooks/` + `state/` → `api/` + `security/`. Screens
 ### 8.7 Data at rest and on screen
 
 - **Do not persist** SMS, USSD replies, IMEI, IMSI, ICCID, phone numbers, tokens or full host lists. The react-query cache is memory only and is cleared on logout/background timeout.
-- AsyncStorage may hold only: refresh interval, router address, device nicknames (keyed by MAC), data plan display prefs, antenna mode best value.
+- AsyncStorage may hold only: refresh interval, router address, device notes keyed by MAC (nickname, type, "known" mark; `state/devicePrefs.ts`, never the router's host list itself), data plan display prefs, antenna mode best value.
 - `android.allowBackup: false` (no ADB/cloud backup of app data).
 - **Block screenshots and the recents preview** (`expo-screen-capture`) on: Login, Wi-Fi password view/edit, Wi-Fi QR, Change admin password, Device information (IMEI/IMSI).
 - Wi-Fi password is hidden by default. Revealing it requires device re-auth (biometric/PIN).
@@ -318,7 +330,7 @@ Security modules are built **first**, not added later.
 - Unit tests (Jest) with **mocked** router responses for: password hash, token rotation, request queue, XML escaping/parsing, error mapping, all validators, redaction, router address validation, fingerprint check, session timeout, lockout handling.
 - Security tests are required for every function in `src/security/` and `src/api/xml.ts`/`validate.ts`.
 - Manual check on the phone (Expo Go) before marking a feature ✅ in FEATURES.md.
-- Current suites (`__tests__/` next to the code): `xml`, `crypto`, `validate`, `client`, `hosts`, `monitoring`, `device`, `rsa`, `password`, `secret`, `reveal`, `wifi` (API); `redact`, `session`, `routerIdentity`, `rebootGate` (security); `format`, `chart`, `usage`, `wifiQr` (utils). 133 tests.
+- Current suites (`__tests__/` next to the code): `xml`, `crypto`, `validate`, `client`, `hosts`, `monitoring`, `device`, `rsa`, `password`, `secret`, `reveal`, `wifi`, `macfilter` (API); `redact`, `session`, `routerIdentity`, `rebootGate` (security); `format`, `chart`, `usage`, `wifiQr`, `devices`, `vendor` (utils); `devicePrefs` (state). 170 tests.
 - Jest mock factories may only reference variables whose names start with `mock` (e.g. `const mockGet = jest.fn()`).
 - TypeScript 6 no longer auto-includes `@types/*`: `tsconfig.json` lists `"types": ["jest", "node"]`. Add new global type packages there.
 

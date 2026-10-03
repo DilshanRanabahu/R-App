@@ -24,7 +24,7 @@ A React Native (Expo) app for managing a Huawei B312-926 (HUAWEI 4G Router 2s) f
 | Built, not yet exercised | Logout, remember password, session expiry / idle logout, mobile data **switching**, reboot + waiting screen, "Trust new router" flow; Phase 2: change admin password, Wi-Fi name/password/hide, show Wi-Fi password, Wi-Fi QR |
 | Security built | Router fingerprint pinning, encrypted password storage (opt-in), login attempt limiter, idle/background logout, screenshot blocking, device re-auth for risky actions, cleartext only to the router, log redaction |
 | App icon | Designed and generated (`assets/`); visible only after a standalone build |
-| Tests | 133 unit tests passing; type check + lint clean |
+| Tests | 170 unit tests passing; type check + lint clean |
 
 ## Legend
 
@@ -107,10 +107,15 @@ Removed on 2026-09-29 (owner's choice): the owner doesn't need SMS or USSD in th
 |---|---|---|---|---|---|---|
 | 8.1 | List Wi-Fi devices (name, IP, connection time) | P1 | `GET /api/wlan/host-list` | Yes | ✅ | ✅ |
 | 8.2 | LAN (cable) devices, merged with Wi-Fi list by MAC, labelled "Wi-Fi" / "Cable" | P2 | `GET /api/lan/HostInfo` | Yes | ✅ | ✅ |
-| 8.3 | Rename device (app-side nickname by MAC) | P2 | app-side | — | — | ⬜ |
-| 8.4 | Block / unblock device (MAC filter) | P2 | `GET/POST /api/wlan/multi-macfilter-settings` | Yes | ⏳ | ⬜ |
+| 8.3 | Name a device and pick its type/icon (kept on the phone, by MAC) | P2 | app-side | — | — | 🔨 |
+| 8.4 | Block / unblock a Wi-Fi device (MAC filter; confirm + fingerprint/PIN; never this phone, not cable devices) | P2 | read `GET /api/wlan/multi-macfilter-settings-ex`, write `POST /api/wlan/multi-macfilter-settings` (format copied from the router's `devicemanagement.js`) | Yes | ✅ GET · ⏳ POST | 🔨 |
 | 8.5 | Highlight "this phone" in the list | P2 | phone IP via `expo-network` | — | — | ✅ |
-| 8.6 | Device detail screen (MAC, IP, time, block button) | P2 | — | — | — | ⬜ |
+| 8.6 | Device detail screen (status, connection, Wi-Fi band, IP, automatic/fixed address, MAC, maker, name on router, block) | P2 | `lan/HostInfo` (`AddressSource`, `isLocalDevice`), `wlan/host-list` (`Frequency`) | Yes | ✅ | 🔨 |
+| 8.7 | Known / new devices: connected devices not marked as known are listed first as "New"; "Mark all as known" | P2 | app-side | — | — | 🔨 |
+| 8.8 | Devices that are not connected now (the router still remembers them) | P2 | `GET /api/lan/HostInfo` (`Active=0`) | Yes | ✅ | 🔨 |
+| 8.9 | Device maker from the MAC address (offline table of common brands; private/random addresses shown as hidden) | P2 | app-side (`scripts/make-oui.py`) | — | — | 🔨 |
+| 8.10 | Rename a device on the router itself (name shared with the web UI) | P3 | `POST /api/lan/changedevicename` (`ID`, `ActualName`; needs `hostnamechange_enabled`) | Yes | ⏳ | ⬜ |
+| 8.11 | Remove a not-connected device from the router's list | P3 | `POST /api/lan/HostInfo` (`ID=0`, `MacAddress`) | Yes | ⏳ | ⬜ |
 
 ## 9. Wi-Fi settings
 
@@ -172,7 +177,8 @@ Tabs
 ├── Home        → 2.x dashboard + speed chart + top/average, session ↓/↑ split,
 │                 4.1 monthly usage (today / this month, plan bar) — no login needed    ✅
 ├── Signal      → 3.x details (antenna mode ⬜)                                        ✅
-├── Devices     → 8.x Wi-Fi + cable devices                                            ✅
+├── Devices     → 8.x Wi-Fi + cable devices ✅ · new / connected / not connected groups,
+│                 device detail (name, type, maker, block / unblock) 🔨
 ├── Router      → status card (name, Online, running time, firmware) ✅, Wi-Fi (9.1–9.3 🔨),
 │                 Internet (5.1 mobile data) ✅, Security (1.9 admin password 🔨), Danger zone
 │                 (10.2 reboot) ✅ · next: data plan (4.2), auto reboot, blocked devices (8.4),
